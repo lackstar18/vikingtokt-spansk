@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spansk A1 · Vikingtokt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilo.css">
+<script>
+  // Las misiones se registran aquí (misiones/misionNN.js llama a ES.mision).
+  window.ES = { misiones: {}, audio: "" };
+  ES.mision = function (m) { ES.misiones[m.id] = m; };
+</script>
+<script src="arte/iconos.js"></script>
+<script src="misiones/mision01.js"></script>
+<script src="audio/lista.js" onerror="void 0"></script>
+</head>
+<body>
+<main id="app"><p class="cargando">Laster…</p></main>
+<div id="capa"></div>
+<script src="juego.js"></script>
+</body>
+</html>

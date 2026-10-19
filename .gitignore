@@ -1,0 +1,12 @@
+# Datos de cada jugador: nunca a GitHub
+progreso.json
+progreso.json.tmp
+copias/
+uso_ia.json
+clave_deepseek.txt
+duelo.json
+duelo.json.tmp
+aviso_estado.json
+cuerno.wav
+__pycache__/
+*.tmp
