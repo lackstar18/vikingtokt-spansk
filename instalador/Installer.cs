@@ -36,9 +36,9 @@ static class Program
     {
         ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;    // TLS 1.2 (GitHub y python.org)
         dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Vikingtokt");
-        if (args.Length == 2 && args[0] == "/prueba") { prueba = true; dir = Path.GetFullPath(args[1]); }
+        if (args.Length == 2 && (args[0] == "/prueba" || args[0] == "-prueba")) { prueba = true; dir = Path.GetFullPath(args[1]); }
         logg = Path.Combine(Path.GetTempPath(), "vikingtokt_installer.log");
-        File.WriteAllText(logg, DateTime.Now + " dir=" + dir + (prueba ? " PRUEBA" : "") + "\r\n");
+        File.WriteAllText(logg, DateTime.Now + " dir=" + dir + (prueba ? " PRUEBA" : "") + "\r\n", Encoding.UTF8);
 
         Application.EnableVisualStyles();
         f = new Form
@@ -64,7 +64,9 @@ static class Program
     static void Slutt(string t, bool feil)
     {
         Logg((feil ? "FEIL: " : "SLUTT: ") + t);
-        f.BeginInvoke((Action)(() => { txt.Text = t; txt.Height = 100; bar.Visible = false; ok.Visible = true; if (feil) txt.ForeColor = Color.FromArgb(255, 140, 120); ok.Focus(); }));
+        f.BeginInvoke((Action)(() => { txt.Text = t; txt.Height = txt.Height * 3 / 2; bar.Visible = false; ok.Top = txt.Bottom + 6; f.ClientSize = new Size(f.ClientSize.Width, ok.Bottom + 14); ok.Visible = true; if (feil) txt.ForeColor = Color.FromArgb(255, 140, 120); ok.Focus();
+            if (prueba) { f.Refresh(); using (var b = new Bitmap(f.Width, f.Height)) { f.DrawToBitmap(b, new Rectangle(0, 0, f.Width, f.Height)); b.Save(Path.Combine(dir, "captura.png")); } }
+            if (prueba) { var tm = new System.Windows.Forms.Timer { Interval = 4000 }; tm.Tick += (s, e) => f.Close(); tm.Start(); } }));   // en prueba se cierra sola
     }
 
     static void Installer()

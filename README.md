@@ -15,19 +15,21 @@ Et spill for å lære spansk (nivå A1) for nordmenn. Du er en viking som går i
 Krigshornet kl. 20:00, duellen og DeepSeek-bonusen finnes bare på PC, men de ser også det du spiller på iPhonen.
 
 ## Installer (Windows)
-1. Trykk **Code → Download ZIP** og pakk ut mappen (for eksempel til `C:\Vikingtokt`).
-2. Dobbeltklikk **Instalar.bat**.
-   - Mangler Python: Microsoft Store → «Python 3.13» → «Get». Kjør Instalar.bat igjen.
-3. Spill med **Vikingtokt** på skrivebordet.
+1. Last ned **[Vikingtokt-Installer.exe](https://github.com/lackstar18/vikingtokt-spansk/releases/latest/download/Vikingtokt-Installer.exe)** og dobbeltklikk den.
+2. Sier Windows «Windows protected your PC»? Trykk **More info** → **Run anyway**.
+3. Installeren henter spillet (og Python, hvis det mangler). Spillet åpnes av seg selv.
+4. Neste gang: **Vikingtokt** på skrivebordet.
+
+Uten installer: **Code → Download ZIP**, pakk ut og dobbeltklikk **Instalar.bat** (trenger Python).
 
 ## Oppdater
-Dobbeltklikk **Actualizar.bat**. Fremgangen din blir liggende.
+I spillet: ⚙️ → **Oppdater**. Eller dobbeltklikk **Actualizar.bat** i mappen. Fremgangen din blir liggende.
 
-## Hva Instalar.bat gjør
+## Hva installeren gjør
 - Krigshornet kl. 20:00 mandag til fredag (oppgave i Windows Oppgaveplanlegger).
 - Duellen starter når PC-en starter (samme wifi som motstanderen).
 - Snarvei «Vikingtokt» på skrivebordet.
-- Fjern alt med **Desinstalar.bat**.
+- Fjern alt: **Settings → Apps → Installed apps → Vikingtokt → Uninstall** (eller **Desinstalar.bat**).
 
 ## Pynt og farger
 - **🛠️ Bygg**: hele leiren er et rutenett. Dra bygninger, palisade og pynt dit du vil (grønt = plass, rødt = ikke plass).
