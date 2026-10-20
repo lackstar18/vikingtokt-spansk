@@ -19,4 +19,8 @@ Get-ChildItem $kilde.FullName -Recurse -File | ForEach-Object {
 }
 Remove-Item $zip -Force
 Remove-Item $ut -Recurse -Force
+# Reinicia el duelo y el servidor para que usen el código nuevo
+Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -match 'duelo\.py|servidor\.py' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+$lnk = Join-Path ([Environment]::GetFolderPath('Startup')) 'Vikingtokt duell.lnk'
+if (Test-Path $lnk) { Start-Process $lnk }
 Write-Host 'Ferdig! Spillet er oppdatert. Fremgangen din er den samme.' -ForegroundColor Green
