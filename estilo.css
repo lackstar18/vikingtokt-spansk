@@ -211,6 +211,7 @@ input[type=range] { width: 220px; accent-color: var(--oro); }
 .pastilla { background: rgba(15, 18, 22, .8); border: 1px solid var(--borde); border-radius: 99px; padding: 6px 14px; font-family: var(--titulo); font-size: 1.15em; color: var(--oro2); }
 .hud-centro { left: 50%; top: 12px; transform: translateX(-50%); max-width: min(520px, 40vw); }
 .hud-centro .estado { font-size: .9em; padding: 8px 14px; background-color: rgba(15, 18, 22, .82); }
+@media (max-width: 1150px) and (min-width: 761px) { .hud-centro { top: 62px; } }     /* que no pise el oro y la rekke */
 .hud-abajo-izq { left: 12px; bottom: 14px; display: flex; gap: 10px; align-items: flex-end; }
 .hud-abajo-izq a { color: var(--dim); }
 .btn.redondo { width: 74px; height: 74px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 1.6em; padding: 0;
