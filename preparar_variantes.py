@@ -2,6 +2,8 @@
 
 Uso:  python preparar_variantes.py
 - Edificios: 3 tonos (el original, _c1 y _c2). Solo cambia el color del tejado (y lo que es de ese color).
+- La låve usa el mismo dibujo que la taberna (medievalStructure_16), pero en rojo (låve noruega) y con
+  otros tonos, para que nunca se vean iguales.
 - Temas del mapa: _host (otoño) y _vinter (invierno) para la hierba y los árboles.
 Necesita Pillow (py -m pip install pillow).
 """
@@ -15,11 +17,12 @@ CARPETA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "arte", "kenn
 # edificio -> (banda de tono del tejado (0-1), tono destino 1, tono destino 2)
 VERDE, NARANJA, AMARILLO = (0.22, 0.50), (0.0, 0.07), (0.09, 0.17)
 EDIFICIOS = {
-    "salon": (VERDE, 0.58, 0.98), "forja": (VERDE, 0.58, 0.98), "taberna": (VERDE, 0.58, 0.98),
+    "salon": (VERDE, 0.58, 0.98), "forja": (VERDE, 0.58, 0.98), "taberna": (VERDE, 0.58, 0.78),
     "casa1": (VERDE, 0.58, 0.98), "casa2": (VERDE, 0.58, 0.98), "casa3": (VERDE, 0.58, 0.98),
-    "granero": (VERDE, 0.58, 0.98), "choza": (VERDE, 0.58, 0.98), "tienda": (VERDE, 0.58, 0.98),
-    "muralla": (NARANJA, 0.60, 0.78), "molino": (AMARILLO, 0.0, 0.58), "mercado": (NARANJA, 0.60, 0.78),
+    "choza": (VERDE, 0.58, 0.98), "tienda": (VERDE, 0.58, 0.98),
+    "muralla": (NARANJA, 0.60, 0.78), "molino": (AMARILLO, 0.0, 0.58), "mercado": (VERDE, 0.58, 0.98),
 }
+LAVE = (0.98, 0.08, 0.14)      # låve: roja, marrón y ocre (sale del dibujo verde de la taberna)
 ARBOLES = ["arbol", "arbol2", "pino", "pino2", "arbusto", "arbusto2", "hierba", "campo", "campo2"]
 
 
@@ -66,6 +69,10 @@ def main():
         for i, d in ((1, d1), (2, d2)):
             recolorear(base.copy(), banda, d, sat=1.05).save(os.path.join(CARPETA, f"{nombre}_c{i}.png"), optimize=True)
             n += 1
+    verde = Image.open(os.path.join(CARPETA, "taberna.png")).convert("RGBA")
+    for suf, d in zip(("", "_c1", "_c2"), LAVE):
+        recolorear(verde.copy(), VERDE, d, sat=1.05).save(os.path.join(CARPETA, f"granero{suf}.png"), optimize=True)
+        n += 1
     for nombre in ARBOLES:
         base = Image.open(os.path.join(CARPETA, nombre + ".png")).convert("RGBA")
         recolorear(base.copy(), VERDE, 0.08, sat=1.1, luz=1.05).save(os.path.join(CARPETA, f"{nombre}_host.png"), optimize=True)
