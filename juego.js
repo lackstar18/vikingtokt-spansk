@@ -104,13 +104,71 @@ async function cargar() {
   }
   const mejor = [local, remoto].filter(Boolean).sort((a, b) => (b.actualizado || 0) - (a.actualizado || 0))[0];
   J = mejor ? completar(mejor) : nueva();
+  await synkTraer();     // lo que jugó en el otro aparato (PC ↔ iPhone)
 }
 let envio = null;
 function guardar() {
   J.actualizado = Date.now();
   try { localStorage.setItem(CLAVE, JSON.stringify(J)); } catch (e) { }
+  synkSubir();
   if (SERVIDOR) { clearTimeout(envio); envio = setTimeout(enviar, 300); }
 }
+/* ================= SYNK: el mismo progreso en el PC y en el iPhone (Elena, 20 oct: «DEBE compartirse») =================
+   Copia en Firebase (Realtime Database del proyecto «vikingtokt»; las reglas solo dejan /synk/<código de 12 o más>).
+   El más nuevo manda; los días jugados, las misiones, el botín y las mejores notas se suman de los dos (igual que synk.py). */
+const SYNK = "https://vikingtokt-66e19-default-rtdb.europe-west1.firebasedatabase.app/synk/";
+const ALF_SYNK = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";     // sin 0/O ni 1/I/L: se leen mal
+let synkEnvio = null, synkHora = 0;
+function fusionar(a, b) {
+  if (!a) return b; if (!b) return a;
+  const [nuevo, viejo] = (a.actualizado || 0) >= (b.actualizado || 0) ? [a, b] : [b, a];
+  const r = JSON.parse(JSON.stringify(nuevo)), max = (x, y) => { const o = Object.assign({}, y || {}); for (const [k, v] of Object.entries(x || {})) o[k] = Math.max(v, o[k] || 0); return o; };
+  r.dias = max(nuevo.dias, viejo.dias); r.misiones = max(nuevo.misiones, viejo.misiones); r.beste = max(nuevo.beste, viejo.beste);
+  r.semanasPerfectas = Object.assign({}, viejo.semanasPerfectas || {}, nuevo.semanasPerfectas || {});
+  r.inv = [...new Set([...(nuevo.inv || []), ...(viejo.inv || [])])];
+  return r;
+}
+async function synkLeer(codigo) {
+  // En la nube va como texto (campo d): Firebase borra los {} y [] vacíos y no admite ciertas claves
+  try { const r = await fetch(SYNK + encodeURIComponent(codigo) + ".json", { cache: "no-store" }); const x = r.ok ? await r.json() : null; return x && x.d ? JSON.parse(x.d) : null; } catch (e) { return null; }
+}
+function synkSubir(ya) {
+  if (!J || !J.synk) return;
+  clearTimeout(synkEnvio);
+  synkEnvio = setTimeout(() => {
+    synkEnvio = null;
+    const body = JSON.stringify({ v: 1, actualizado: J.actualizado || 0, d: JSON.stringify(J) });
+    fetch(SYNK + encodeURIComponent(J.synk) + ".json", { method: "PUT", body, keepalive: body.length < 60000 }).then(r => { if (r.ok) synkHora = Date.now(); }).catch(() => { });
+  }, ya ? 0 : 1500);
+}
+async function synkTraer() {     // trae lo del otro aparato; true si ha cambiado algo
+  if (!J || !J.synk) return false;
+  const r = await synkLeer(J.synk);
+  if (!r || !r.v) { synkSubir(true); return false; }
+  synkHora = Date.now();
+  if ((r.actualizado || 0) > (J.actualizado || 0)) { const codigo = J.synk; J = completar(fusionar(r, J)); J.synk = codigo; guardar(); return true; }
+  if ((r.actualizado || 0) < (J.actualizado || 0)) synkSubir(true);
+  return false;
+}
+async function synkConectar(codigo) {     // en el aparato nuevo: el progreso de la nube manda
+  codigo = (codigo || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (codigo.length !== 12) return "kode";
+  codigo = codigo.match(/.{4}/g).join("-");
+  const r = await synkLeer(codigo);
+  if (!r || !r.v) return "finnes";
+  J = completar(fusionar(r, Object.assign({}, J, { actualizado: 0 }))); J.synk = codigo; guardar(); synkSubir(true);
+  return "ok";
+}
+function synkNuevo() {
+  let c = ""; const a = new Uint32Array(12); crypto.getRandomValues(a);
+  for (const x of a) c += ALF_SYNK[x % ALF_SYNK.length];
+  J.synk = c.match(/.{4}/g).join("-"); guardar(); synkSubir(true);
+}
+addEventListener("visibilitychange", () => {     // al salir: subir ya; al volver a la app (iPhone): mirar si jugó en el PC
+  if (document.visibilityState === "hidden") { if (synkEnvio) synkSubir(true); return; }
+  if (J && J.synk && !enAsalto)
+    synkTraer().then(c => { if (c && !enAsalto && !$(".fondo") && J.nombre) pintarCampamento(); });
+});
 function enviar() { if (SERVIDOR) fetch("api/progreso", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(J), keepalive: true }).catch(() => { }); }
 addEventListener("pagehide", () => { if (SERVIDOR && navigator.sendBeacon) navigator.sendBeacon("api/progreso", new Blob([JSON.stringify(J)], { type: "application/json" })); });
 const hechasHoy = () => J.dias[hoy()] || 0;
@@ -865,6 +923,31 @@ function ajustes() {
         : [h("span", { class: "faint" }, OPPD ? `Versjon ${OPPD.local}` : ""), h("button", { class: "btn chico", onclick: async e => { e.target.textContent = "…"; await sjekkOppdatering(true); pintarVersjon(); } }, "Se etter oppdatering")]));
   };
   pintarVersjon();
+  const synkCaja = h("div", { class: "synk-caja" });
+  const pintarSynk = () => {
+    if (J.synk) {
+      synkCaja.replaceChildren(h("h3", null, "📱 Samme spill på telefon og PC"),
+        h("p", { class: "dim" }, "Synk-koden din:"), h("div", { class: "synk-kode" }, J.synk),
+        h("p", { class: "faint" }, "Skriv koden i Vikingtokt på den andre enheten (⚙️ → «Koble til»)."),
+        h("p", { class: "faint" }, synkHora ? `✓ Synket kl. ${new Date(synkHora).toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" })}` : "Synker …"),
+        h("div", { class: "fila centro" },
+          h("button", { class: "btn chico", onclick: async e => { try { await navigator.clipboard.writeText(J.synk); e.target.textContent = "Kopiert ✓"; } catch (err) { } } }, "📋 Kopier"),
+          h("button", { class: "btn chico", onclick: () => { if (confirm("Slutte å synke denne enheten?")) { delete J.synk; guardar(); pintarSynk(); } } }, "Slå av synk")));
+      if (!synkHora) setTimeout(() => { if (synkCaja.isConnected) pintarSynk(); }, 1500);     // pinta la hora cuando acabe de subir
+    } else {
+      const inp = h("input", { class: "resp", placeholder: "XXXX-XXXX-XXXX", maxlength: 16, autocomplete: "off", style: "max-width:220px;font-size:1em;padding:8px 12px" }), feil = h("span", { class: "faint" });
+      synkCaja.replaceChildren(h("h3", null, "📱 Samme spill på telefon og PC"),
+        h("p", { class: "faint" }, "Spill på PC-en og på iPhonen med samme leir, gull og LP."),
+        h("div", { class: "fila centro" }, h("button", { class: "btn chico oro", onclick: () => { synkNuevo(); pintarSynk(); } }, "Lag synk-kode")),
+        h("p", { class: "faint" }, "Har du allerede en kode fra den andre enheten?"),
+        h("div", { class: "fila centro" }, inp, h("button", { class: "btn chico", onclick: async () => {
+          feil.textContent = "…"; const r = await synkConectar(inp.value);
+          if (r === "ok") { location.reload(); return; }
+          feil.textContent = r === "kode" ? "Koden har 12 tegn, f.eks. K7M4-QX2P-8HTN." : "Fant ikke koden. Sjekk den, og at du har internett.";
+        } }, "Koble til"), feil));
+    }
+  };
+  pintarSynk();
   let prueba = null;
   const cerrar = modal([h("h2", null, "⚙️ Innstillinger"),
     h("label", { class: "fila centro", style: "margin-top:14px" }, "🔉 Volum",
@@ -873,7 +956,7 @@ function ajustes() {
         clearTimeout(prueba); prueba = setTimeout(() => { SFX.moneda(); decir("¡Hola, vikingo!", "h"); }, 300);
       } }), vol),
     h("label", { class: "fila centro" }, h("input", { type: "checkbox", checked: J.ajustes.auto, onchange: e => { J.ajustes.auto = e.target.checked; guardar(); } }), "Spill spansk lyd automatisk"),
-    versjon,
+    versjon, synkCaja,
     h("div", { class: "fila centro", style: "margin-top:16px" },
       h("button", { class: "btn", onclick: () => cerrar() }, "Lukk"),
       h("button", { class: "btn chico rojo", onclick: () => { if (confirm("Slette leiren din og begynne på nytt?") && confirm("Sikker? Dette kan ikke angres.")) { localStorage.removeItem(CLAVE); location.reload(); } } }, "Nullstill"))]);
@@ -1480,6 +1563,19 @@ function cuerno() {
 }
 
 /* ================= arranque ================= */
+function synkBienvenida() {     // iPhone nuevo: entrar con el progreso del PC
+  const inp = h("input", { class: "resp", placeholder: "XXXX-XXXX-XXXX", maxlength: 16, autocomplete: "off" }), feil = h("p", { class: "faint" });
+  const antes = TECLAS.enter;
+  const koble = async () => {
+    feil.textContent = "…"; const r = await synkConectar(inp.value);
+    if (r === "ok") { location.reload(); return; }
+    feil.textContent = r === "kode" ? "Koden har 12 tegn, f.eks. K7M4-QX2P-8HTN." : "Fant ikke koden. Sjekk den, og at du har internett.";
+  };
+  const cerrar = modal([h("h2", null, "📱 Synk-kode"), h("p", { class: "dim" }, "Finn koden på PC-en: ⚙️ → «Samme spill på telefon og PC»."), inp, feil,
+    h("div", { class: "fila centro", style: "margin-top:12px" }, h("button", { class: "btn oro", onclick: koble }, "Koble til ⏎"),
+      h("button", { class: "btn", onclick: () => { cerrar(); TECLAS.enter = antes; } }, "Lukk"))], "fija");
+  TECLAS.enter = koble; setTimeout(() => inp.focus(), 50);
+}
 function bienvenida() {
   const inp = h("input", { class: "resp", placeholder: "Vikingnavnet ditt", maxlength: 20, autocomplete: "off" });
   const empezar = () => {
@@ -1489,7 +1585,8 @@ function bienvenida() {
   pantalla(h("div", { class: "panel runa", style: "margin-top:8vh" }, ic("drakkar", "xxg", "#e0b04f"), h("h1", null, "Skipet ditt når Spania"),
     h("p", null, "Du er en viking. Leiren din står på stranden. For å erobre Spania må du snakke spansk."),
     h("p", { class: "dim" }, "Dra på tokt hver ukedag (man–fre), så mange ganger du vil. Hopper du over en ukedag, brenner spanjolene leiren din."),
-    h("div", { style: "max-width:360px;margin:16px auto" }, inp), h("button", { class: "btn oro grande", onclick: empezar }, "GÅ I LAND ⏎")));
+    h("div", { style: "max-width:360px;margin:16px auto" }, inp), h("button", { class: "btn oro grande", onclick: empezar }, "GÅ I LAND ⏎"),
+    h("p", { class: "faint", style: "margin-top:20px" }, h("a", { href: "#", onclick: e => { e.preventDefault(); synkBienvenida(); } }, "📱 Spiller du allerede på PC-en? Skriv synk-koden"))));
   TECLAS.enter = empezar; setTimeout(() => inp.focus(), 50);
 }
 async function arrancar() {

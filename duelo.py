@@ -60,6 +60,16 @@ def leer(ruta):
         return {}
 
 
+def leer_progreso(ruta):
+    """Progreso del juego: el de este PC unido con el del iPhone (synk.py). La app de noruego no usa synk."""
+    p = leer(ruta)
+    try:
+        from synk import con_synk
+        return con_synk(p) if p.get("synk") else p
+    except ImportError:
+        return p
+
+
 def minimo_de(inicio, lun):
     """La semana en la que empiezas solo pide los días de clase que quedaban (igual que las dos apps)."""
     if inicio and inicio > lun:
@@ -88,7 +98,7 @@ def semanas_cumplidas(app, p, ini, hoy):
 
 def mis_datos(app, ruta, nombre):
     """Lo de esta semana de este PC: {nombre, idioma, semana, hechos, minimo}."""
-    p, hoy = leer(ruta), date.today()
+    p, hoy = leer_progreso(ruta), date.today()
     lun = lunes(hoy)
     if app == "es":
         dias = p.get("dias") or {}

@@ -325,3 +325,9 @@ input[type=range] { width: 220px; accent-color: var(--oro); }
   .hud-abajo-izq { gap: 6px; max-width: calc(100vw - 132px); flex-wrap: wrap; }
   .btn-tokt { width: 104px !important; height: 104px !important; }
 }
+
+/* Synk PC ↔ iPhone (⚙️) */
+.synk-caja { margin-top: 18px; padding: 12px; border: 1px solid rgba(224,176,79,.35); border-radius: 12px; background: rgba(0,0,0,.18); }
+.synk-caja h3 { margin: 0 0 6px; font-size: 1em; }
+.synk-caja p { margin: 6px 0; }
+.synk-kode { font: 700 1.5em/1.2 ui-monospace, Consolas, monospace; letter-spacing: .08em; color: #e0b04f; margin: 4px 0 8px; user-select: all; }

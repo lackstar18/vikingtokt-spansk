@@ -27,9 +27,14 @@ APLAZAR_VECES = 2
 def leer(ruta):
     try:
         with open(ruta, encoding="utf-8") as f:
-            return json.load(f)
+            p = json.load(f)
     except (OSError, ValueError):
         return {}
+    try:      # también lo que jugó en el iPhone (progreso compartido, synk.py)
+        from synk import con_synk
+        return con_synk(p)
+    except ImportError:
+        return p
 
 
 def debe_avisar(p, hoy, hora=None):

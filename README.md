@@ -7,7 +7,12 @@ Et spill for å lære spansk (nivå A1) for nordmenn. Du er en viking som går i
 2. Trykk **Share** (firkanten med pil opp) → **Add to Home Screen**.
 3. Nå har du Vikingtokt med ikon på hjemskjermen.
 
-På iPhone lagres fremgangen i telefonen (ikke den samme som på PC-en). Krigshornet kl. 20:00, duellen og DeepSeek-bonusen finnes bare på PC.
+### Samme leir på PC og iPhone (synk)
+1. På PC-en: ⚙️ → **Lag synk-kode**. Du får en kode, f.eks. `K7M4-QX2P-8HTN`.
+2. På iPhonen: trykk **📱 Spiller du allerede på PC-en?** (eller ⚙️ → **Koble til**) og skriv koden.
+3. Ferdig. Gull, LP, bygninger og dager følger med begge veier (det trengs internett).
+
+Krigshornet kl. 20:00, duellen og DeepSeek-bonusen finnes bare på PC, men de ser også det du spiller på iPhonen.
 
 ## Installer (Windows)
 1. Trykk **Code → Download ZIP** og pakk ut mappen (for eksempel til `C:\Vikingtokt`).
