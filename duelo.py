@@ -9,6 +9,7 @@ Cada PC lo tiene en marcha en segundo plano:
 - LIGA por internet (pedido de Elena, 20 oct): con un código (K7M4-QX2P) juegan amigos de otras casas.
   Usa ntfy.sh (gratis, sin cuentas): el código es la «contraseña» del canal. Solo se envía nombre,
   idioma y lecciones de la semana. ntfy.sh guarda los mensajes 12 h: cada PC se vuelve a anunciar cada 3 h.
+- AMIGOS (20 oct): cada jugador tiene su código de amigo; quien lo añade le ve en su lista (como Clash Royale).
 
 Uso:
   pythonw duelo.py --app es --progreso "D:/ElaraAI/Elara/espanol/progreso.json"      (el juego de español)
@@ -106,6 +107,10 @@ def tema(codigo):
     return "vikingtokt_liga_" + codigo.replace("-", "").lower()
 
 
+def tema_amigo(codigo):
+    return "vikingtokt_venn_" + codigo.replace("-", "").lower()
+
+
 def codigo_nuevo():
     c = "".join(random.SystemRandom().choice(ALFABETO) for _ in range(8))
     return c[:4] + "-" + c[4:]
@@ -126,6 +131,7 @@ class Duelo:
         self.estado.setdefault("marcador", {"yo": 0, "rival": 0, "empates": 0})
         self.estado.setdefault("rival", None)
         self.estado.setdefault("liga", None)       # {codigo, miembros: {id: datos}, ultimo, publicado, firma}
+        self.estado.setdefault("amigos", {"mi_codigo": codigo_nuevo(), "lista": {}, "publicado": 0, "firma": ""})   # lista: {codigo: datos}
         self.ntfy = NTFY
         self.ya_mirado = 0
         self.despertar = threading.Event()
@@ -169,7 +175,39 @@ class Duelo:
             if r and r.get("semana") != yo["semana"]:
                 r = dict(r, hechos=0, minimo=MINIMO, semana=yo["semana"])   # aún no ha anunciado esta semana
             return {"yo": yo, "rival": r, "visto_hace_s": int(time.time() - r["ts"]) if r else None,
-                    "marcador": self.estado["marcador"], "liga": self.tabla_liga(yo)}
+                    "marcador": self.estado["marcador"], "liga": self.tabla_liga(yo), "amigos": self.tabla_amigos(yo)}
+
+    # ---------------- amigos ----------------
+    def tabla_amigos(self, yo):
+        A = self.estado["amigos"]
+        if A["lista"] and time.time() - self.ya_mirado > 60:
+            self.ya_mirado = 0
+            self.despertar.set()
+        filas = []
+        for c, m in A["lista"].items():
+            f = dict(m, codigo=c)
+            if f.get("semana") != yo["semana"]:
+                f.update(hechos=0, semana=yo["semana"])
+            filas.append(f)
+        filas.sort(key=lambda f: (-f.get("hechos", 0), -f.get("uker", 0), f.get("nombre", "")))
+        return {"mi_codigo": A["mi_codigo"], "lista": filas}
+
+    def amigo(self, accion, codigo):
+        c = codigo_valido(codigo)
+        if not c:
+            return {"ok": False, "error": "codigo"}
+        with self.cand:
+            A = self.estado["amigos"]
+            if accion == "anadir":
+                if c == A["mi_codigo"]:
+                    return {"ok": False, "error": "tuyo"}
+                A["lista"].setdefault(c, {"nombre": "…", "hechos": 0, "minimo": MINIMO, "uker": 0, "semana": "", "visto": 0})
+            elif accion == "quitar":
+                A["lista"].pop(c, None)
+            self.guardar()
+        self.ya_mirado = 0
+        self.despertar.set()
+        return {"ok": True}
 
     # ---------------- liga por internet ----------------
     def tabla_liga(self, yo):
@@ -207,6 +245,39 @@ class Duelo:
         self.despertar.set()
         return {"ok": True, "codigo": (self.estado.get("liga") or {}).get("codigo")}
 
+    def bucle_amigos(self):
+        A = self.estado["amigos"]
+        yo = self.yo()
+        firma = json.dumps([yo["semana"], yo["hechos"], yo["minimo"], yo["uker"], yo["nombre"]])
+        if firma != A.get("firma") or time.time() - A.get("publicado", 0) > ANUNCIO_CADA:
+            msg = json.dumps(dict(yo, app=APP_LIGA, id=self.id), ensure_ascii=False).encode("utf-8")
+            self._http(f"{self.ntfy}/{tema_amigo(A['mi_codigo'])}", msg)
+            with self.cand:
+                A["firma"], A["publicado"] = firma, time.time()
+                self.guardar()
+        if A["lista"] and time.time() - A.get("mirado", 0) > MIRAR_CADA or (A["lista"] and self.ya_mirado == 0):
+            for c in list(A["lista"]):
+                texto = self._http(f"{self.ntfy}/{tema_amigo(c)}/json?poll=1&since=12h")
+                ultimo = None
+                for linea in texto.splitlines():
+                    try:
+                        ev = json.loads(linea)
+                        d = json.loads(ev.get("message", "")) if ev.get("event") == "message" else None
+                    except ValueError:
+                        continue
+                    if d and d.get("app") == APP_LIGA:
+                        ultimo = (d, ev.get("time", time.time()))
+                if ultimo:
+                    d, t = ultimo
+                    with self.cand:
+                        if c in A["lista"]:
+                            A["lista"][c] = {"nombre": str(d.get("nombre", "?"))[:30], "idioma": d.get("idioma") if d.get("idioma") in ("es", "no") else "?",
+                                             "semana": str(d.get("semana", ""))[:10], "hechos": int(d.get("hechos", 0)), "minimo": int(d.get("minimo", MINIMO)),
+                                             "uker": int(d.get("uker", 0)), "visto": t}
+            with self.cand:
+                A["mirado"] = time.time()
+                self.guardar()
+
     def _http(self, url, datos=None):
         req = urllib.request.Request(url, data=datos, headers={"User-Agent": "vikingtokt-liga"})
         with urllib.request.urlopen(req, timeout=15) as r:
@@ -216,6 +287,10 @@ class Duelo:
         while True:
             self.despertar.wait(30)
             self.despertar.clear()
+            try:
+                self.bucle_amigos()
+            except (urllib.error.URLError, socket.timeout, OSError, ValueError):
+                pass
             L = self.estado.get("liga")
             if not L:
                 continue
@@ -320,12 +395,17 @@ def servir(duelo, puerto):
             self._json(duelo.respuesta())
 
         def do_POST(self):
-            if self.path.split("?")[0] != "/liga":
+            ruta = self.path.split("?")[0]
+            if ruta not in ("/liga", "/amigo"):
                 return self._json({"error": "no"}, 404)
             try:
                 d = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)).decode("utf-8"))
             except (ValueError, UnicodeDecodeError):
                 return self._json({"error": "formato"}, 400)
+            if ruta == "/amigo":
+                if d.get("accion") not in ("anadir", "quitar"):
+                    return self._json({"error": "accion"}, 400)
+                return self._json(duelo.amigo(d["accion"], str(d.get("codigo", ""))))
             if d.get("accion") not in ("crear", "unirse", "salir"):
                 return self._json({"error": "accion"}, 400)
             self._json(duelo.liga(d["accion"], str(d.get("codigo", ""))))

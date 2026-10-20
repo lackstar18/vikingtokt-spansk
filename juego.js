@@ -122,10 +122,10 @@ function revisarAusencias() {
 }
 function ataque(d) {
   let txt;
-  if (J.edif.empalizada > 1) { J.edif.empalizada--; txt = `brente palisaden din (nivå ${J.edif.empalizada + 1} → ${J.edif.empalizada}).`; }
+  if (J.edif.empalizada > 1) { J.edif.empalizada--; J.fuego = "empalizada"; txt = `brente palisaden din (nivå ${J.edif.empalizada + 1} → ${J.edif.empalizada}).`; }
   else {
     const r = Math.min(J.oro, Math.max(10, Math.round(J.oro * 0.4)));
-    J.oro -= r; txt = r ? `brøt seg inn i langhuset ditt og stjal ${r} gull.` : "knuste døra til det tomme langhuset ditt.";
+    J.oro -= r; J.fuego = "salon"; txt = r ? `brøt seg inn i langhuset ditt og stjal ${r} gull.` : "knuste døra til det tomme langhuset ditt.";
   }
   const lp = Math.min(J.lp, 15); J.lp -= lp;
   return { d, txt, lp };
@@ -220,6 +220,7 @@ document.addEventListener("keydown", e => {
 /* ================= capas: avisos y modales ================= */
 function modal(contenido, clase) {
   const capa = $("#capa"), f = h("div", { class: "fondo" }, h("div", { class: "modal " + (clase || "") }, contenido));
+  if (!(clase || "").includes("rojo")) f.addEventListener("pointerdown", e => { if (e.target === f) f.remove(); });   // clic fuera = cerrar (los avisos rojos, no)
   capa.append(f);
   return () => f.remove();
 }
@@ -229,70 +230,224 @@ function aviso(txt, icono) {
 }
 
 /* ================= CAMPAMENTO ================= */
-function pantalla(...kids) { const a = $("#app"); a.innerHTML = ""; a.append(...kids); window.scrollTo(0, 0); TECLAS = {}; }
+function pantalla(...kids) { const a = $("#app"); a.classList.remove("pantalla-mapa"); a.innerHTML = ""; a.append(...kids); window.scrollTo(0, 0); TECLAS = {}; }
 function avatar() {
   const e = J.equipo, it = id => BOTIN.find(b => b.id === id);
   const c = it(e.casco), a = it(e.arma), s = it(e.escudo);
   return h("div", { class: "avatar" }, ic("viking-head", "xg", "#d8cfc0"),
     c ? ic(c.ic, "casco", c.color) : null, a ? ic(a.ic, "arma", a.color) : null, s ? ic(s.ic, "escudo", s.color) : null);
 }
+/* ================= CAMPAMENTO: mapa tipo Clash of Clans (arte: Kenney «Medieval RTS», CC0) ================= */
+const K = n => `arte/kenney/${n}.png`;
+const MUNDO = { w: 1600, h: 1150 };
+const PARCELAS = [   // x, y = pie del edificio; t = ancho en px del mundo
+  { id: "salon", img: "salon", n: "Langhuset", x: 800, y: 560, t: 240 },
+  { id: "empalizada", img: "muralla", n: "Palisaden", x: 800, y: 845, t: 220 },
+  { id: "forja", img: "forja", n: "Smia", x: 495, y: 640, t: 165 },
+  { id: "molino", img: "molino", n: "Mølla", x: 430, y: 390, t: 165 },
+  { id: "taberna", img: "taberna", n: "Tavernaen", x: 1100, y: 650, t: 150, bloq: 3, txt: "mat og drikke" },
+  { id: "mercado", img: "mercado", n: "Markedet", x: 1120, y: 400, t: 165, bloq: 5, txt: "tall og priser" },
+];
+const MOLINO_HORA = 6, MOLINO_MAX = 48;      // oro por hora y tope del molino
+function semilla(n) { return () => { n = (n * 9301 + 49297) % 233280; return n / 233280; }; }
+function decorado() {
+  const out = [], r = semilla(7);
+  const fijos = [["casa1", 640, 400, 105], ["casa2", 975, 470, 105], ["casa3", 640, 780, 110], ["choza", 965, 790, 95], ["pozo", 700, 690, 70],
+    ["granero", 300, 600, 120], ["roca", 1270, 760, 90], ["oro", 1300, 520, 90], ["tronco", 560, 860, 70], ["arbusto", 900, 300, 55], ["arbusto", 720, 320, 50]];
+  for (const [img, x, y, t] of fijos) out.push({ img, x, y, t });
+  for (const [x, y] of [[300, 430], [360, 430], [300, 490], [360, 490]]) out.push({ img: "campo", x, y, t: 64, tile: true });
+  for (let i = 0; i < 70; i++) {      // bosque alrededor, fuera del pueblo y del mar
+    const x = 40 + r() * 1520, y = 60 + r() * 800, dx = (x - 800) / 560, dy = (y - 560) / 360;
+    if (dx * dx + dy * dy < 1 || y > 830) continue;
+    out.push({ img: ["pino", "arbol", "pino2", "arbol2", "pino"][Math.floor(r() * 5)], x, y, t: 70 + r() * 40 });
+  }
+  return out.sort((a, b) => a.y - b.y);
+}
+function oroMolino() {
+  if (!J.molino) { J.molino = { t: Date.now() }; guardar(); }
+  return Math.min(MOLINO_MAX, Math.floor((Date.now() - J.molino.t) / 3600e3 * MOLINO_HORA));
+}
+function recogerMolino(cerca) {
+  const n = oroMolino(); if (n < 1) return 0;
+  J.oro += n; J.molino.t = Date.now(); guardar(); SFX.moneda(); SFX.moneda();
+  if (cerca) flotaMapa(cerca, `+${n}`);
+  return n;
+}
+let vistaMapa = null;    // {s, x, y}: se recuerda al volver al campamento
+function flotaMapa(el, txt) { const f = h("div", { class: "flota oro", style: "left:50%;top:0" }, txt); el.append(f); setTimeout(() => f.remove(), 950); }
+
 function pintarCampamento() {
   terminarMejoras();
   const r = rango(J.lp), t = hoy(), finde = esFinde(t), hecho = hechasHoy() > 0;
   const titulo = J.equipo.titulo ? BOTIN.find(b => b.id === J.equipo.titulo).titulo : "Vikingkriger";
-  const cab = h("div", { class: "panel cabecera" }, avatar(),
-    h("div", { style: "flex:1;min-width:180px" },
-      h("div", { class: "nombre" }, J.nombre), h("div", { class: "dim" }, titulo),
-      h("div", { class: "rango", style: `color:${r.c}` }, ic("laurels-trophy", "", r.c), `${r.n} · ${J.lp} LP`),
-      h("div", { class: "barra", title: r.sig ? `${r.sig.lp - J.lp} LP til ${r.sig.n}` : "Høyeste rang" }, h("i", { style: `width:${Math.round(r.pct * 100)}%` }))),
-    h("div", { class: "oro-cuenta", title: "Gull" }, ic("two-coins", "g", "#e0b04f"), J.oro),
-    h("button", { class: "btn icono", title: "Innstillinger", onclick: ajustes }, "⚙️"));
+  const lun = lunesDe(t), hechasSemana = [0, 1, 2, 3, 4].filter(i => J.dias[masDias(lun, i)] > 0).length;
+  const m = ES.misiones[1];
 
+  // ---- el mundo ----
+  const mundo = h("div", { class: "mundo", style: `width:${MUNDO.w}px;height:${MUNDO.h}px` },
+    h("div", { class: "playa" }), h("div", { class: "mar" }));
+  const pon = (o, clase) => { const el = h("img", { class: "objeto-mapa " + (clase || ""), src: K(o.img), alt: "", draggable: "false",
+    style: `left:${o.x}px;top:${o.y}px;width:${o.t}px` + (o.tile ? ";transform:translate(-50%,-50%)" : "") }); mundo.append(el); return el; };
+  decorado().forEach(o => pon(o));
+  // barco vikingo en la playa y, si hoy toca y no ha jugado, el barco del capitán acercándose
+  mundo.append(h("div", { class: "barco", style: "left:470px;top:960px" }, ic("drakkar", "", "#6b4a2b")));
+  if (!finde && !hecho) {
+    const avance = Math.min(1, (new Date().getHours() + new Date().getMinutes() / 60) / 24);
+    mundo.append(h("div", { class: "barco enemigo", style: `left:${1480 - avance * 420}px;top:${960 + avance * 10}px`, title: "Capitán Rodrigo kommer ved midnatt" }, ic("drakkar", "", "#c2413a")));
+  }
+  // escudo (hoy ya jugó) o fuego (te atacaron y aún no te has vengado)
+  if (hecho && !finde) mundo.append(h("div", { class: "escudo-mapa", style: "left:340px;top:280px;width:920px;height:640px", title: "Skjold: leiren er trygg i dag" }));
+  // edificios
+  for (const P of PARCELAS) {
+    const nivel = J.edif[P.id], bloq = P.bloq && !(J.misiones[P.bloq - 1] > 0) && P.bloq > 1;
+    const el = h("div", { class: "edificio" + (bloq ? " bloq" : ""), style: `left:${P.x}px;top:${P.y}px;width:${P.t}px;z-index:${Math.round(P.y)}` },
+      h("img", { src: K(P.img), alt: P.n, draggable: "false" }));
+    if (P.id === "molino") el.append(h("img", { class: "aspas", src: K("aspas"), alt: "", draggable: "false" }));
+    const etiqueta = bloq ? `🔒 ${P.n}` : nivel ? `${P.n} · nv. ${nivel}` : P.n;
+    el.append(h("div", { class: "cartel" }, etiqueta));
+    if (J.mejora && J.mejora.id === P.id) el.append(h("div", { class: "obra" }, "🔨 ", cuenta(J.mejora.fin - Date.now())));
+    if (J.fuego === P.id) el.append(h("img", { class: "fuego-mapa", src: K("fuego"), alt: "", draggable: "false" }), h("img", { class: "fuego-mapa f2", src: K("fuego"), alt: "", draggable: "false" }));
+    if (P.id === "molino" && oroMolino() >= MOLINO_HORA) el.append(h("div", { class: "burbuja-oro", title: "Samle inn" }, ic("two-coins", "", "#e0b04f"), " +" + oroMolino()));
+    el.addEventListener("click", e => { if (vistaMapa && vistaMapa.arrastrado) return; e.stopPropagation(); SFX.madera(); abrirEdificio(P, el); });
+    mundo.append(el);
+  }
+  // aldeanos y guerreros que pasean
+  const caminantes = [["aldeano", 640, 600], ["aldeana", 900, 640], ["vikingo", 780, 760], ["vikingo2", 560, 480]].map(([img, x, y]) => {
+    const el = h("img", { class: "aldeano", src: K(img), alt: "", draggable: "false", style: `left:${x}px;top:${y}px` }); mundo.append(el); return el; });
+
+  // ---- HUD encima del mapa ----
   const estado = finde
-    ? h("div", { class: "estado finde" }, ic("campfire", "g"), "Helg. Ingen angrep. Hvil ved bålet, kriger — eller dra på tokt for bytte hvis du vil.")
+    ? h("div", { class: "estado finde" }, ic("campfire", "g"), "Helg. Ingen angrep. Hvil ved bålet, kriger.")
     : hecho
-      ? h("div", { class: "estado seguro" }, ic("viking-shield", "g"), `Leiren er trygg i dag. ${hechasHoy()} tokt gjort. Dra på tokt igjen for mer gull og kister!`)
-      : h("div", { class: "estado peligro" }, ic("burning-embers", "g"), "Ingen tokt i dag ennå! Ved midnatt angriper Capitán Rodrigo leiren din.");
+      ? h("div", { class: "estado seguro" }, ic("viking-shield", "g"), `Leiren er trygg i dag. ${hechasHoy()} tokt gjort.`)
+      : h("div", { class: "estado peligro" }, ic("burning-embers", "g"), "Ingen tokt i dag! Ved midnatt angriper Capitán Rodrigo.");
+  const hud = h("div", { class: "hud-mapa" },
+    h("div", { class: "hud-izq" }, avatar(), h("div", null, h("div", { class: "nombre" }, J.nombre), h("div", { class: "dim", style: "font-size:.85em" }, titulo),
+      h("div", { class: "rango", style: `color:${r.c}` }, ic("laurels-trophy", "", r.c), `${r.n} · ${J.lp} LP`),
+      h("div", { class: "barra", style: "width:150px", title: r.sig ? `${r.sig.lp - J.lp} LP til ${r.sig.n}` : "Høyeste rang" }, h("i", { style: `width:${Math.round(r.pct * 100)}%` })))),
+    h("div", { class: "hud-centro" }, estado),
+    h("div", { class: "hud-der" }, h("div", { class: "pastilla", title: "Gull" }, ic("two-coins", "", "#e0b04f"), " " + J.oro),
+      h("div", { class: "pastilla", title: "Denne uka (man–fre)" }, "📅 " + hechasSemana + "/5"),
+      h("button", { class: "btn icono", title: "Innstillinger", onclick: ajustes }, "⚙️")),
+    h("div", { class: "hud-abajo-izq" }, h("button", { class: "btn redondo", onclick: abrirVenner, title: "Venner og liga" }, "👥", h("small", null, "Venner")),
+      h("button", { class: "btn redondo", onclick: inventario, title: "Smia: byttet ditt" }, "🎒", h("small", null, "Bytte")),
+      h("a", { href: "#", class: "faint", onclick: e => { e.preventDefault(); creditos(); } }, "Kreditter")),
+    h("div", { class: "hud-abajo-der" }, h("button", { class: "btn-tokt", onclick: () => cartaTokt(m) }, "⚔️", h("span", null, hecho ? "NYTT TOKT" : "TOKT"))));
 
-  const lun = lunesDe(t);
+  const mapa = h("div", { class: "mapa" }, mundo);
+  pantalla(mapa, hud);
+  $("#app").classList.add("pantalla-mapa");
+  montarVista(mapa, mundo);
+  pasear(caminantes);
+  TECLAS.enter = () => cartaTokt(m);
+}
+/* Arrastrar para moverse y rueda (o pellizco) para el zoom. */
+function montarVista(vp, mundo) {
+  const W = MUNDO.w, H = MUNDO.h;
+  const minS = () => Math.max(vp.clientWidth / W, vp.clientHeight / H);
+  let v = vistaMapa || (() => { const s = Math.max(minS(), Math.min(vp.clientWidth / 1300, vp.clientHeight / 1000, 1.2)); return { s, x: vp.clientWidth / 2 - 800 * s, y: vp.clientHeight / 2 - 570 * s }; })();
+  vistaMapa = v;
+  function aplicar() {
+    v.s = Math.min(1.8, Math.max(minS(), v.s));
+    v.x = Math.min(0, Math.max(vp.clientWidth - W * v.s, v.x)); v.y = Math.min(0, Math.max(vp.clientHeight - H * v.s, v.y));
+    mundo.style.transform = `translate(${v.x}px,${v.y}px) scale(${v.s})`;
+  }
+  function zoom(f, cx, cy) { const s0 = v.s; v.s = v.s * f; aplicar(); const k = v.s / s0; v.x = cx - (cx - v.x) * k; v.y = cy - (cy - v.y) * k; aplicar(); }
+  const punteros = new Map(); let ini = null, dist0 = 0;
+  vp.addEventListener("pointerdown", e => {
+    punteros.set(e.pointerId, [e.clientX, e.clientY]);
+    if (punteros.size === 1) { ini = { x: e.clientX, y: e.clientY, vx: v.x, vy: v.y }; v.arrastrado = false; }
+    if (punteros.size === 2) { const [a, b] = [...punteros.values()]; dist0 = Math.hypot(a[0] - b[0], a[1] - b[1]); }
+  });
+  vp.addEventListener("pointermove", e => {
+    if (!punteros.has(e.pointerId)) return;
+    punteros.set(e.pointerId, [e.clientX, e.clientY]);
+    if (punteros.size === 2) { const [a, b] = [...punteros.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (dist0) zoom(d / dist0, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); dist0 = d; v.arrastrado = true; return; }
+    if (!ini) return;
+    const dx = e.clientX - ini.x, dy = e.clientY - ini.y;
+    if (!v.arrastrado && Math.hypot(dx, dy) > 6) { v.arrastrado = true; vp.classList.add("arrastrando"); try { vp.setPointerCapture(e.pointerId); } catch (err) { } }
+    if (v.arrastrado) { v.x = ini.vx + dx; v.y = ini.vy + dy; aplicar(); }
+  });
+  const soltar = e => { punteros.delete(e.pointerId); if (!punteros.size) { ini = null; vp.classList.remove("arrastrando"); setTimeout(() => { v.arrastrado = false; }, 0); } };
+  vp.addEventListener("pointerup", soltar); vp.addEventListener("pointercancel", soltar);
+  vp.addEventListener("wheel", e => { e.preventDefault(); zoom(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX, e.clientY); }, { passive: false });
+  window.__aplicarMapa = aplicar;
+  if (!window.__resizeMapa) { window.__resizeMapa = true; addEventListener("resize", () => { if (window.__aplicarMapa && $(".mapa")) window.__aplicarMapa(); }); }
+  aplicar();
+}
+function pasear(caminantes) {
+  const puntos = [[620, 600], [700, 700], [900, 650], [980, 560], [820, 700], [560, 520], [760, 640], [880, 760], [520, 700], [1000, 700]];
+  for (const el of caminantes) {
+    const mover = () => {
+      if (!el.isConnected) return;
+      const [x, y] = puntos[Math.floor(Math.random() * puntos.length)], x0 = parseFloat(el.style.left);
+      el.style.transform = `translate(-50%,-100%) scaleX(${x < x0 ? -1 : 1})`;
+      el.style.left = x + "px"; el.style.top = y + "px"; el.style.zIndex = Math.round(y);
+      setTimeout(mover, 5200 + Math.random() * 2500);
+    };
+    setTimeout(mover, 300 + Math.random() * 2000);
+  }
+}
+/* Ficha de un edificio (como en Clash of Clans). */
+function abrirEdificio(P, el) {
+  const nivel = J.edif[P.id], bloq = P.bloq && !(J.misiones[P.bloq - 1] > 0) && P.bloq > 1;
+  const cuerpo = [h("img", { src: K(P.img), alt: "", style: "width:120px" }), h("h2", null, P.n + (nivel ? ` · nivå ${nivel}` : ""))];
+  const fila = h("div", { class: "fila centro", style: "margin-top:14px" });
+  let cerrar;
+  if (bloq) cuerpo.push(h("p", { class: "dim" }, `🔒 Låses opp når du har klart oppdrag ${P.bloq - 1}: ${P.txt}.`));
+  else if (P.id === "molino") {
+    const n = oroMolino();
+    cuerpo.push(h("p", null, `Mølla lager ${MOLINO_HORA} gull i timen (maks ${MOLINO_MAX}). Kom tilbake og samle inn!`), h("p", { class: "botin-cuenta" }, ic("two-coins", "", "#e0b04f"), ` ${n} klar`));
+    fila.append(h("button", { class: "btn oro", disabled: n < 1, onclick: () => { recogerMolino(el); cerrar(); pintarCampamento(); } }, `Samle inn ${n} gull`));
+  } else if (P.id === "forja") {
+    cuerpo.push(h("p", null, `Her ligger byttet fra kistene: ${J.inv.length} ting. Kle deg ut som en ekte viking!`));
+    fila.append(h("button", { class: "btn oro", onclick: () => { cerrar(); inventario(); } }, "Åpne smia"));
+  } else if (EDIFICIOS[P.id]) {
+    const E = EDIFICIOS[P.id], coste = E.coste(nivel);
+    cuerpo.push(h("p", null, E.efecto(nivel)));
+    if (J.fuego === P.id) cuerpo.push(h("p", { style: "color:#ff8a80" }, "🔥 Capitán Rodrigo satte fyr på den. Dra på tokt for å slukke brannen!"));
+    if (J.mejora && J.mejora.id === P.id) cuerpo.push(h("p", { class: "dim" }, `🔨 Byggerne jobber. Klar om ${cuenta(J.mejora.fin - Date.now())}.`));
+    else if (nivel >= E.max) cuerpo.push(h("p", { class: "dim" }, "Maks nivå."));
+    else {
+      cuerpo.push(h("p", { class: "faint" }, `Neste nivå: ${E.efecto(nivel + 1)}. Ferdig kl. 20:00.`));
+      fila.append(h("button", { class: "btn oro", disabled: !!J.mejora || J.oro < coste, title: J.mejora ? "Byggerne dine er opptatt" : "",
+        onclick: () => { J.oro -= coste; J.mejora = { id: P.id, fin: proximas20() }; guardar(); SFX.madera(); cerrar(); pintarCampamento(); } },
+        ic("two-coins", "", "#2a1d05"), ` ${coste} · Oppgrader`));
+      if (J.mejora) cuerpo.push(h("p", { class: "faint" }, "Byggerne dine er opptatt med en annen bygning."));
+      else if (J.oro < coste) cuerpo.push(h("p", { class: "faint" }, `Du trenger ${coste - J.oro} gull til. Dra på tokt!`));
+    }
+  }
+  fila.append(h("button", { class: "btn", onclick: () => cerrar() }, "Lukk"));
+  cerrar = modal([...cuerpo, fila]);
+  TECLAS.enter = () => { cerrar(); pintarCampamento(); };
+  // en el molino, tocarlo con oro listo también lo recoge directamente
+  if (P.id === "molino" && oroMolino() >= MOLINO_HORA && !bloq) { /* la ficha ya ofrece el botón */ }
+}
+function cartaTokt(m) {
+  const t = hoy(), lun = lunesDe(t);
   const semana = h("div", { class: "semana" }, ["Man", "Tir", "Ons", "Tor", "Fre"].map((n, i) => {
     const d = masDias(lun, i), ok = J.dias[d] > 0, pasado = d < t, antes = d < J.creado;
     const cl = ok ? "hecho" : d === t ? "hoy" : pasado && !antes ? "fallo" : "";
     return h("div", { class: "dia " + cl }, h("b", null, ok ? "✓" : pasado && !antes ? "✗" : ""), n);
   }));
-  const hechasSemana = [0, 1, 2, 3, 4].filter(i => J.dias[masDias(lun, i)] > 0).length;
-
-  const m = ES.misiones[1];
-  const asalto = h("div", { class: "panel asalto" },
-    h("div", { class: "dim" }, `Oppdrag ${m.id} · ${m.tema}`), h("h1", null, `${m.titulo} · ${m.es}`),
-    h("p", { class: "dim" }, "3 bølger + boss · ca. 8 minutter"),
-    h("button", { class: "btn oro grande", onclick: () => asaltar(m) }, hecho ? "⚔️ NYTT TOKT" : "⚔️ TOKT"),
-    h("div", { class: "fila centro", style: "margin-top:16px" }, semana, h("div", { class: "dim" }, `Denne uka: ${hechasSemana}/5 · 5/5 = kiste for perfekt uke`)));
-
-  const edificios = h("div", { class: "edificios" },
-    Object.entries(EDIFICIOS).map(([id, e]) => {
-      const l = J.edif[id], enObra = J.mejora && J.mejora.id === id, coste = e.coste(l);
-      const boton = enObra ? h("div", { class: "dim" }, ic("hourglass"), ` Klar om ${cuenta(J.mejora.fin - Date.now())}`)
-        : l >= e.max ? h("div", { class: "dim" }, "Maks nivå")
-          : h("button", { class: "btn chico", disabled: !!J.mejora || J.oro < coste, title: J.mejora ? "Byggerne dine er opptatt" : "",
-            onclick: () => { J.oro -= coste; J.mejora = { id, fin: proximas20() }; guardar(); SFX.madera(); pintarCampamento(); } },
-            ic("two-coins", "", "#e0b04f"), ` ${coste} · Oppgrader`);
-      return h("div", { class: "edif" }, h("span", { class: "nivel" }, `Nv. ${l}`), ic(e.ic, "xg"), h("h3", null, e.n), h("div", { class: "efecto" }, e.efecto(l)), boton);
-    }),
-    h("div", { class: "edif", style: "cursor:pointer", onclick: inventario }, ic("anvil", "xg"), h("h3", null, "Smia"),
-      h("div", { class: "efecto" }, `Byttet ditt: ${J.inv.length} ting`), h("button", { class: "btn chico" }, "Åpne")),
-    BLOQUEADOS.map(b => h("div", { class: "edif bloq" }, ic(b.ic, "xg"), h("h3", null, b.n), h("div", { class: "efecto" }, ic("padlock"), " ", b.txt))));
-
-  const duelo = h("div", { class: "panel duelo" }, ic("crossed-swords", "xg", "#c2413a"), h("div", { style: "flex:1" }, h("h2", null, "Duell"), h("div", { class: "dim" }, "Ser etter Elena…")));
-  pintarDuelo(duelo);
-
-  pantalla(cab, estado, asalto, h("h2", { style: "margin-top:18px" }, "Leiren din"), edificios, duelo,
-    h("p", { class: "faint centro" }, h("a", { href: "#", style: "color:inherit", onclick: e => { e.preventDefault(); creditos(); } }, "Kreditter")));
-  TECLAS.enter = () => asaltar(m);
+  const ir = () => { cerrar(); asaltar(m); };
+  const cerrar = modal([ic("crossed-axes", "xg"), h("div", { class: "dim" }, `Oppdrag ${m.id} · ${m.tema}`), h("h1", null, `${m.titulo}`), h("h2", { style: "color:var(--dim)" }, m.es),
+    h("p", { class: "dim" }, "3 bølger + boss · ca. 8 minutter"), h("div", { class: "fila centro" }, semana), h("p", { class: "faint" }, "5/5 denne uka = kiste for perfekt uke"),
+    h("div", { class: "fila centro", style: "margin-top:12px" }, h("button", { class: "btn oro grande", onclick: ir }, "⚔️ KJØR ⏎"), h("button", { class: "btn", onclick: () => cerrar() }, "Lukk"))]);
+  TECLAS.enter = ir;
+}
+async function abrirVenner() {
+  const caja = h("div", null, h("div", { class: "dim" }, "Laster…"));
+  const cerrar = modal([caja, h("div", { class: "fila centro", style: "margin-top:14px" }, h("button", { class: "btn", onclick: () => cerrar() }, "Lukk"))], "ancho");
+  pintarDuelo(caja);
 }
 
 /* Duelo por la red de casa: duelo.py (en este PC) dice cómo va cada uno esta semana. */
 const DUELO = "http://127.0.0.1:8770";
+async function amigoAccion(accion, codigo) {
+  try { return await (await fetch(DUELO + "/amigo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accion, codigo: codigo || "" }) })).json(); }
+  catch (e) { return { ok: false, error: "red" }; }
+}
 async function ligaAccion(accion, codigo) {
   try { return await (await fetch(DUELO + "/liga", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accion, codigo: codigo || "" }) })).json(); }
   catch (e) { return { ok: false, error: "red" }; }
@@ -307,6 +462,19 @@ async function pintarDuelo(caja, otraVez) {
   const fila = (n, x, der) => h("div", { style: "margin-top:6px" }, h("div", { class: "fila entre" }, h("b", null, n), h("span", null, `${x.hechos}/${x.minimo}`, x.hechos >= x.minimo ? " ✅" : "", der || "")),
     h("div", { class: "barra" }, h("i", { style: `width:${Math.min(100, x.hechos / Math.max(1, x.minimo) * 100)}%` })));
   if (!d) { info.append(...plano(h("h2", null, "Duell og liga"), h("div", { class: "dim" }, "Duellen er ikke i gang. Åpne spillet med «Vikingtokt» på skrivebordet."))); return; }
+  if (d.amigos) {
+    const A = d.amigos, kode = h("input", { class: "resp", placeholder: "Vennens kode", maxlength: 12, style: "max-width:200px;font-size:1em;padding:8px 12px", autocomplete: "off" }), feilA = h("span", { class: "faint" });
+    const kopierA = h("button", { class: "btn chico", onclick: async e => { try { await navigator.clipboard.writeText(A.mi_codigo); e.target.textContent = "Kopiert ✓"; } catch (err) { } } }, "📋 Kopier");
+    const legg = async () => { const r = await amigoAccion("anadir", kode.value); if (r.ok) pintarDuelo(caja); else feilA.textContent = r.error === "tuyo" ? "Det er din egen kode 😄" : r.error === "codigo" ? "Feil kode (8 tegn, f.eks. K7M4-QX2P)." : "Fikk ikke koblet til."; };
+    info.append(...plano(h("h3", { style: "margin-top:0" }, "👥 Venner"),
+      h("div", { class: "fila" }, h("span", { class: "faint" }, "Din vennekode:"), h("b", { class: "liga-kode" }, A.mi_codigo), kopierA),
+      h("div", { class: "fila", style: "margin-top:6px" }, kode, h("button", { class: "btn chico oro", onclick: legg }, "Legg til venn"), feilA),
+      A.lista.length ? A.lista.map(x => x.visto ? h("div", { class: "fila", style: "gap:6px" }, h("div", { style: "flex:1" }, fila(`${x.nombre} · ${x.idioma === "no" ? "norsk" : "spansk"}`, x, ` · 🏆 ${x.uker || 0}`)),
+          h("button", { class: "btn chico", title: "Fjern venn", onclick: async () => { if (confirm(`Fjerne ${x.nombre}?`)) { await amigoAccion("quitar", x.codigo); pintarDuelo(caja); } } }, "✕"))
+        : h("p", { class: "dim" }, `Venter på ${x.codigo}… (vennen må ha spillet åpent minst én gang)`))
+        : h("p", { class: "dim" }, "Ingen venner ennå. Gi dem koden din, så legger de deg til!"),
+      h("hr", { style: "border-color:var(--borde);margin:14px 0" })));
+  }
   if (d.liga) {
     const L = d.liga;
     const kopier = h("button", { class: "btn chico", onclick: async e => { try { await navigator.clipboard.writeText(L.codigo); e.target.textContent = "Kopiert ✓"; } catch (err) { } } }, "📋 Kopier");
@@ -363,7 +531,7 @@ function creditos() {
   const cerrar = modal([h("h2", null, "Kreditter"), h("div", { class: "creditos" },
     h("p", null, "Ikoner fra ", h("a", { href: "https://game-icons.net", target: "_blank", style: "color:var(--oro)" }, "game-icons.net"), " (CC BY 3.0):"),
     h("ul", null, Object.entries(autores).map(([a, l]) => h("li", null, `Ikoner laget av ${a}: ${l.join(", ")}`))),
-    h("p", null, "Skrifter: Cinzel og Lexend (SIL Open Font License). Spanske stemmer: Microsoft Edge tekst-til-tale.")),
+    h("p", null, "Kart og bygninger: Kenney «Medieval RTS» (CC0, kenney.nl). Skrifter: Cinzel og Lexend (SIL Open Font License). Spanske stemmer: Microsoft Edge tekst-til-tale.")),
   h("button", { class: "btn", onclick: () => cerrar() }, "Lukk")]);
 }
 
@@ -694,7 +862,7 @@ async function resultado(m, st) {
   const lp = primera ? 15 + Math.round(pct * 10) : extras < 3 ? 5 : 0;
   const oro = Math.round(st.oro * (1 + 0.1 * (J.edif.salon - 1)));
   J.dias[t] = (J.dias[t] || 0) + 1; J.misiones[m.id] = (J.misiones[m.id] || 0) + 1;
-  J.oro += oro; J.lp += lp; guardar();
+  J.oro += oro; J.lp += lp; if (primera) J.fuego = null; guardar();
   const rDespues = rango(J.lp), sube = rDespues.i > rAntes.i;
   // semana perfecta: 5 de 5 de lunes a viernes
   const lun = lunesDe(t), perfecta = !esFinde(t) && [0, 1, 2, 3, 4].every(i => J.dias[masDias(lun, i)] > 0) && !J.semanasPerfectas[lun];

@@ -156,6 +156,75 @@ input[type=range] { width: 220px; accent-color: var(--oro); }
 
 .liga-kode { font-family: var(--titulo); letter-spacing: .08em; color: var(--oro2); font-size: 1.15em; }
 
+/* ---------- mapa del campamento (tipo Clash of Clans) ---------- */
+#app.pantalla-mapa { max-width: none; padding: 0; }
+.mapa { position: fixed; inset: 0; overflow: hidden; background: #3d8a4f; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.mapa.arrastrando { cursor: grabbing; }
+.mundo { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #4caf50 url(arte/kenney/hierba.png) 0 0 / 96px 96px; }
+.playa { position: absolute; left: 0; right: 0; top: 862px; height: 110px; background: url(arte/kenney/arena.png) 0 0 / 96px 96px;
+  border-radius: 46% 54% 0 0 / 40px 50px 0 0; box-shadow: 0 -6px 0 rgba(0, 0, 0, .06); }
+.mar { position: absolute; left: 0; right: 0; top: 930px; bottom: 0; background: url(arte/kenney/agua.png) 0 0 / 96px 96px; animation: olas 9s linear infinite;
+  border-radius: 54% 46% 0 0 / 30px 26px 0 0; }
+@keyframes olas { to { background-position: 96px 24px; } }
+.objeto-mapa { position: absolute; transform: translate(-50%, -100%); pointer-events: none; }
+.edificio { position: absolute; transform: translate(-50%, -88%); cursor: pointer; filter: drop-shadow(0 8px 5px rgba(0, 0, 0, .35)); transition: filter .15s, transform .15s; }
+.edificio:hover { filter: drop-shadow(0 0 12px #f5d27a) drop-shadow(0 8px 5px rgba(0, 0, 0, .35)); transform: translate(-50%, -90%) scale(1.03); }
+.edificio > img { width: 100%; display: block; }
+.edificio .cartel { position: absolute; left: 50%; top: -8px; transform: translate(-50%, -100%); white-space: nowrap; background: rgba(15, 18, 22, .86); color: #f5d27a;
+  font: 700 15px var(--titulo); padding: 3px 11px; border-radius: 99px; border: 1px solid #8a6a22; }
+.edificio.bloq > img { filter: grayscale(.85) brightness(.75); }
+.edificio .aspas { position: absolute; width: 78%; left: 11%; top: -16%; animation: girar 5s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+.edificio .obra { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); white-space: nowrap; background: #e0b04f; color: #2a1d05; font-weight: 700;
+  padding: 3px 10px; border-radius: 99px; box-shadow: 0 2px 0 #8a6a22; animation: martillo 1s ease-in-out infinite; }
+@keyframes martillo { 50% { transform: translateX(-50%) translateY(-4px); } }
+.edificio .fuego-mapa { position: absolute; width: 38%; left: 18%; top: 18%; animation: llama .45s ease-in-out infinite alternate; pointer-events: none; }
+.edificio .fuego-mapa.f2 { left: 52%; top: 30%; width: 30%; animation-delay: .2s; }
+@keyframes llama { from { transform: scale(1, .9); opacity: .85; } to { transform: scale(.92, 1.08); opacity: 1; } }
+.burbuja-oro { position: absolute; left: 50%; top: -80px; transform: translateX(-50%); background: #fff7e0; color: #5a3d06; font-weight: 800; padding: 4px 12px;
+  border-radius: 99px; border: 2px solid #e0b04f; white-space: nowrap; animation: rebote 1.2s ease-in-out infinite; }
+@keyframes rebote { 50% { transform: translateX(-50%) translateY(-8px); } }
+.barco { position: absolute; width: 170px; transform: translate(-50%, -50%); animation: mecer 3.2s ease-in-out infinite; pointer-events: none; }
+.barco .ic { width: 170px; height: 170px; filter: drop-shadow(0 6px 3px rgba(0, 30, 60, .35)); }
+.barco.enemigo { width: 130px; }
+.barco.enemigo .ic { width: 130px; height: 130px; }
+@keyframes mecer { 50% { transform: translate(-50%, -54%) rotate(-3deg); } }
+.escudo-mapa { position: absolute; border-radius: 50%; border: 3px solid rgba(160, 205, 255, .75); pointer-events: none;
+  background: radial-gradient(ellipse at 50% 40%, rgba(160, 205, 255, .04) 55%, rgba(160, 205, 255, .26)); animation: escudo 4s ease-in-out infinite; z-index: 2000; }
+@keyframes escudo { 50% { opacity: .65; } }
+.aldeano { position: absolute; width: 54px; transform: translate(-50%, -100%); transition: left 5s linear, top 5s linear; pointer-events: none; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .3)); }
+.hud-mapa { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+.hud-mapa > * { pointer-events: auto; position: absolute; }
+.hud-izq { left: 12px; top: 12px; display: flex; gap: 10px; align-items: center; background: rgba(15, 18, 22, .78); padding: 8px 14px 8px 8px; border-radius: 16px; border: 1px solid var(--borde); }
+.hud-izq .avatar { width: 64px; height: 64px; }
+.hud-izq .avatar > .ic:first-child { width: 44px; height: 44px; }
+.hud-izq .nombre { font-size: 1.15em; }
+.hud-der { right: 12px; top: 12px; display: flex; gap: 8px; align-items: center; }
+.pastilla { background: rgba(15, 18, 22, .8); border: 1px solid var(--borde); border-radius: 99px; padding: 6px 14px; font-family: var(--titulo); font-size: 1.15em; color: var(--oro2); }
+.hud-centro { left: 50%; top: 12px; transform: translateX(-50%); max-width: min(520px, 40vw); }
+.hud-centro .estado { font-size: .9em; padding: 8px 14px; background-color: rgba(15, 18, 22, .82); }
+.hud-abajo-izq { left: 12px; bottom: 14px; display: flex; gap: 10px; align-items: flex-end; }
+.hud-abajo-izq a { color: var(--dim); }
+.btn.redondo { width: 74px; height: 74px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 1.6em; padding: 0;
+  background: rgba(15, 18, 22, .85); border: 2px solid var(--oro); }
+.btn.redondo small { font-size: .42em; font-family: var(--fuente); color: var(--oro2); }
+.hud-abajo-der { right: 16px; bottom: 16px; }
+.btn-tokt { width: 130px; height: 130px; border-radius: 50%; border: 4px solid #8a6a22; background: radial-gradient(circle at 50% 35%, var(--oro2), var(--oro) 60%, #b07c1f);
+  color: #2a1d05; font-size: 2.4em; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  box-shadow: 0 8px 0 #6e521a, 0 12px 24px rgba(0, 0, 0, .45); animation: latidoTokt 2.2s ease-in-out infinite; }
+.btn-tokt span { font: 900 .45em var(--titulo); letter-spacing: .05em; }
+.btn-tokt:active { transform: translateY(4px); box-shadow: 0 4px 0 #6e521a; }
+@keyframes latidoTokt { 50% { transform: scale(1.05); } }
+.modal.ancho { max-width: 640px; text-align: left; max-height: 86vh; overflow: auto; }
+@media (max-width: 760px) {
+  .hud-centro { top: auto; bottom: 160px; max-width: 92vw; }
+  .hud-izq .dim, .hud-izq .barra { display: none; }
+  .hud-der { top: 96px; }
+  .hud-izq .avatar { width: 52px; height: 52px; }
+  .btn-tokt { width: 104px; height: 104px; }
+}
+@media (prefers-reduced-motion: reduce) { .mar, .aspas, .barco, .escudo-mapa, .btn-tokt, .burbuja-oro, .obra { animation: none !important; } .aldeano { transition: none; } }
+
 @media (max-width: 600px) {
   body { font-size: 16px; }
   .opciones { grid-template-columns: 1fr; }

@@ -17,6 +17,10 @@ Dobbeltklikk **Actualizar.bat**. Fremgangen din blir liggende.
 - Snarvei «Vikingtokt» på skrivebordet.
 - Fjern alt med **Desinstalar.bat**.
 
+## Venner
+Trykk **👥 Venner** i leiren. Der ser du **vennekoden din**. Gi den til vennene dine, og skriv inn koden deres med **Legg til venn**.
+Da ser du uka deres (x/5) og 🏆. De ser deg når de legger deg til.
+
 ## Liga med venner (over internett)
 1. Én av dere trykker **Lag en liga** nederst i leiren (Duell). Da får du en kode, for eksempel `K7M4-QX2P`.
 2. Del koden med vennene dine.
@@ -30,5 +34,6 @@ Lag filen `clave_deepseek.txt` i spillmappen med API-nøkkelen. Uten nøkkel hop
 
 ## Kreditter
 - Ikoner: [game-icons.net](https://game-icons.net) (CC BY 3.0) — Lorc, Delapouite, Skoll, Caro Asercion.
+- Kart og bygninger: Kenney «Medieval RTS» (CC0, kenney.nl).
 - Skrifter: Cinzel og Lexend (SIL Open Font License).
 - Spanske stemmer: Microsoft Edge tekst-til-tale.
