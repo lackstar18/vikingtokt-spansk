@@ -316,3 +316,5 @@ input[type=range] { width: 220px; accent-color: var(--oro); }
 .lista-dup { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
 .fila-dup { background: #1b2129; border: 1px solid var(--borde2); border-radius: 10px; padding: 6px 10px; }
 .pieza:disabled { opacity: .5; cursor: not-allowed; }
+/* ---------- vennetokt ---------- */
+.vt-reloj { max-width: 720px; margin: 10px auto 0; }

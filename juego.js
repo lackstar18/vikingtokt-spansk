@@ -86,6 +86,7 @@ function lev(a, b) {
 /* ================= partida ================= */
 function nueva() {
   return { v: 1, nombre: "", creado: hoy(), revisado: masDias(hoy(), -1), oro: 30, lp: 0, edif: { salon: 1, empalizada: 1, molino: 1, forja: 1 }, mejora: null, dup: {}, taverna: { f: "", n: 0 },
+    beste: {}, skjold: 0, vennetokt: { f: "", gjort: [] }, hevn: {}, angrepSett: [],
     dias: {}, misiones: {}, inv: [], equipo: { casco: null, arma: null, escudo: null, titulo: null },
     semanasPerfectas: {}, cuerno: { f: "", n: 0, prox: 0 }, ajustes: { volumen: 50, auto: true } };
 }
@@ -231,7 +232,7 @@ let TECLAS = {};
 document.addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT" && e.key !== "Enter") return;
   if (e.key === "Enter" && TECLAS.enter) { e.preventDefault(); TECLAS.enter(); }
-  else if (/^[1-4]$/.test(e.key) && TECLAS.num) { e.preventDefault(); TECLAS.num(+e.key); }
+  else if (/^[1-4]$/.test(e.key) && TECLAS.num) { e.preventDefault(); TECLAS.num(+e.key - 1); }     // tecla 1 = primera opción
   else if (e.key === " " && TECLAS.espacio) { e.preventDefault(); TECLAS.espacio(); }
 });
 
@@ -811,7 +812,9 @@ async function pintarDuelo(caja, otraVez) {
     info.append(...plano(h("h3", { style: "margin-top:0" }, "👥 Venner"),
       h("div", { class: "fila" }, h("span", { class: "faint" }, "Din vennekode:"), h("b", { class: "liga-kode" }, A.mi_codigo), kopierA),
       h("div", { class: "fila", style: "margin-top:6px" }, kode, h("button", { class: "btn chico oro", onclick: legg }, "Legg til venn"), feilA),
-      A.lista.length ? A.lista.map(x => x.visto ? h("div", { class: "fila", style: "gap:6px" }, h("div", { style: "flex:1" }, fila(`${x.nombre} · ${x.idioma === "no" ? "norsk" : "spansk"}`, x, ` · 🏆 ${x.uker || 0}`)),
+      A.lista.length ? A.lista.map(x => x.visto ? h("div", { class: "fila", style: "gap:6px" }, h("div", { style: "flex:1" }, fila(`${x.nombre} · ${x.idioma === "no" ? "norsk" : "spansk"}`, x, ` · 🏆 ${x.uker || 0}`),
+            x.tokt && x.idioma === "es" ? h("div", { class: "faint" }, `🪙 ${x.tokt.gull} · Palisade nv. ${x.tokt.pal} · beste ${x.tokt.beste[String(felles(x))] || 0} %`) : null),
+          angripKnapp(x),
           h("button", { class: "btn chico", title: "Fjern venn", onclick: async () => { if (confirm(`Fjerne ${x.nombre}?`)) { await amigoAccion("quitar", x.codigo); pintarDuelo(caja); } } }, "✕"))
         : h("p", { class: "dim" }, `Venter på ${x.codigo}… (vennen må ha spillet åpent minst én gang)`))
         : h("p", { class: "dim" }, "Ingen venner ennå. Gi dem koden din, så legger de deg til!"),
@@ -874,6 +877,133 @@ function ajustes() {
     h("div", { class: "fila centro", style: "margin-top:16px" },
       h("button", { class: "btn", onclick: () => cerrar() }, "Lukk"),
       h("button", { class: "btn chico rojo", onclick: () => { if (confirm("Slette leiren din og begynne på nytt?") && confirm("Sikker? Dette kan ikke angres.")) { localStorage.removeItem(CLAVE); location.reload(); } } }, "Nullstill"))]);
+}
+/* ================= VENNETOKT (plan aprobado por Elena, 20 oct) =================
+   Atacar a un amigo = examen de 10 preguntas de las misiones que han hecho los dos (2:30).
+   Gana si saca más que la mejor nota de su amigo en esa misión (o 10/10). Se lleva el 10 % de su oro (máx. 150),
+   menos 1 % por cada nivel de Palisaden del amigo. Si pierde, el amigo gana 20 por defenderse. Nunca se rompen
+   edificios. Un ataque por amigo y día. Quien pierde oro tiene escudo 24 h y una venganza gratis («Hevn»). */
+const VT_SEG = 150;
+async function hentDuelo() {
+  try { const c = new AbortController(); setTimeout(() => c.abort(), 1500); return await (await fetch(DUELO + "/duelo", { cache: "no-store", signal: c.signal })).json(); }
+  catch (e) { return null; }
+}
+const felles = x => Math.max(1, Math.min(x.tokt ? x.tokt.oppdrag || 1 : 1, Math.max(1, ...Object.keys(J.misiones).filter(k => J.misiones[k] > 0).map(Number), 1)));
+function vtStatus(x) {
+  const t = x.tokt, ahora = Date.now();
+  if (!t || x.idioma !== "es") return null;
+  const hevn = J.hevn && J.hevn[x.codigo] && J.hevn[x.codigo].til > ahora;
+  if (hevn) return { ok: true, hevn: true };
+  if (Math.max(t.skjold || 0, x.skjold_visto || 0) * 1000 > ahora) return { ok: false, txt: "🛡️ Skjold" };
+  if (J.vennetokt && J.vennetokt.f === hoy() && J.vennetokt.gjort.includes(x.codigo)) return { ok: false, txt: "✓ I dag" };
+  return { ok: true };
+}
+function angripKnapp(x) {
+  const v = vtStatus(x);
+  if (!v) return null;
+  if (!v.ok) return h("span", { class: "faint", style: "white-space:nowrap" }, v.txt);
+  return h("button", { class: "btn chico " + (v.hevn ? "rojo" : "oro"), onclick: () => { document.querySelectorAll(".fondo").forEach(f => f.remove()); vennetokt(x, v.hevn); } }, v.hevn ? "⚔️ HEVN" : "⚔️ Angrip");
+}
+function vtSporsmal(k) {     // 10 preguntas: la mitad español → noruego, la otra mitad al revés
+  const pares = new Map();
+  for (let i = 1; i <= k; i++) { const m = ES.misiones[i]; if (!m) continue; for (const o of m.oleadas) for (const p of (o.items || o.ejemplos || [])) if (Array.isArray(p) && p[0] && p[1]) pares.set(p[0], p); }
+  const todos = [...pares.values()];
+  return azar(todos, 10).map((p, i) => {
+    const es = i % 2 === 0, q = es ? p[0] : p[1], ok = es ? p[1] : p[0];
+    const parecidos = todos.filter(x => x !== p && (es ? x[1] : x[0]) !== ok).sort((a, b) => Math.abs((es ? a[1] : a[0]).length - ok.length) - Math.abs((es ? b[1] : b[0]).length - ok.length));
+    return { q, ok, es, ops: barajar([ok, ...azar(parecidos.slice(0, 8), 3).map(x => es ? x[1] : x[0])]) };
+  });
+}
+async function vennetokt(x, hevn) {
+  const k = felles(x), beste = x.tokt.beste[String(k)] || 0, maks = Math.min(150, Math.round(x.tokt.gull * (10 - Math.min(5, x.tokt.pal - 1)) / 100));
+  // 1) presentación
+  const empezar = await new Promise(res => {
+    pantalla(h("div", { class: "escena runa" }, ic("crossed-swords", "xxg", hevn ? "#ff6b5e" : "#e0b04f"), h("h1", null, hevn ? `HEVN mot ${x.nombre}!` : `Vennetokt mot ${x.nombre}`),
+      h("p", null, `10 spørsmål · ${Math.floor(VT_SEG / 60)}:${String(VT_SEG % 60).padStart(2, "0")} min`),
+      h("p", { class: "dim" }, `Slå ${x.nombre}s beste: mer enn ${beste} % riktig (eller 10 av 10).`),
+      h("p", { class: "botin-cuenta" }, ic("two-coins", "", "#e0b04f"), ` Bytte: opptil ${maks} gull`),
+      h("div", { class: "fila centro", style: "margin-top:14px" }, h("button", { class: "btn oro grande", onclick: () => res(true) }, "START ⏎"), h("button", { class: "btn", onclick: () => res(false) }, "Tilbake"))));
+    TECLAS.enter = () => res(true);
+  });
+  if (!empezar) return pintarCampamento();
+  // 2) el examen
+  enAsalto = true; SFX.cuerno();
+  const preg = vtSporsmal(k), fin = Date.now() + VT_SEG * 1000;
+  let riktige = 0;
+  for (let i = 0; i < preg.length && Date.now() < fin; i++) {
+    const P = preg[i];
+    const bien = await new Promise(res => {
+      const reloj = h("i", { style: `width:${(fin - Date.now()) / (VT_SEG * 10)}%` });
+      const botones = P.ops.map((o, j) => h("button", { class: "op", onclick: () => elegir(j) }, h("span", { class: "k" }, j + 1), o));
+      pantalla(h("div", { class: "hud" }, h("span", { class: "oleada" }, `⚔️ ${x.nombre} · ${i + 1}/10`), h("span", { style: "flex:1" }), h("span", { class: "botin-cuenta" }, `✓ ${riktige}`)),
+        h("div", { class: "barra vt-reloj" }, reloj),
+        h("div", { class: "escena" }, h("div", { class: "fila centro" }, h("div", { class: "palabra" }, P.q), P.es ? bAudio(P.q, "h") : null),
+          h("div", { class: "traduccion" }, P.es ? "Hva betyr det?" : "Hvordan sier man det på spansk?"), h("div", { class: "opciones" }, botones)));
+      let hecho = false;
+      const tic = setInterval(() => { const q = fin - Date.now(); reloj.style.width = Math.max(0, q / (VT_SEG * 10)) + "%"; if (q <= 0) { clearInterval(tic); if (!hecho) { hecho = true; res(false); } } }, 250);
+      function elegir(j) {
+        if (hecho || j >= P.ops.length) return; hecho = true; clearInterval(tic);
+        const b = P.ops[j] === P.ok;
+        botones.forEach((bt, n) => { bt.disabled = true; if (P.ops[n] === P.ok) bt.classList.add("bien"); else if (n === j) bt.classList.add("mal"); });
+        if (b) { SFX.golpe(); SFX.moneda(); } else SFX.mal();
+        setTimeout(() => res(b), b ? 450 : 1100);
+      }
+      TECLAS.num = elegir;
+      if (P.es) { TECLAS.espacio = () => decir(P.q, "h"); if (J.ajustes.auto) setTimeout(() => decir(P.q, "h"), 150); }
+    });
+    if (bien) riktige++;
+  }
+  enAsalto = false;
+  // 3) resultado: se manda al amigo; sin internet no cuenta (nadie gana ni pierde)
+  const pct = riktige * 10, vant = pct > beste || riktige === 10, bytte = vant ? maks : 0;
+  pantalla(h("div", { class: "escena runa" }, h("h2", null, "Sender…")));
+  let r = { ok: false };
+  try { r = await (await fetch(DUELO + "/vennetokt", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kode: x.codigo, vant, gull: vant ? bytte : 20, hevn: !!hevn }) })).json(); } catch (e) { }
+  if (r.ok) {
+    if (vant) J.oro += bytte;
+    if (hevn) delete J.hevn[x.codigo];
+    else { if (!J.vennetokt || J.vennetokt.f !== hoy()) J.vennetokt = { f: hoy(), gjort: [] }; J.vennetokt.gjort.push(x.codigo); }
+    guardar();
+  }
+  await new Promise(res => {
+    if (r.ok && vant) SFX.victoria(); else if (r.ok) SFX.derrota();
+    pantalla(h("div", { class: "escena runa" }, ic(vant ? "laurels-trophy" : "viking-shield", "xg", vant ? "#e0b04f" : "#9aa5b1"),
+      h("h1", null, !r.ok ? "Fikk ikke sendt angrepet" : vant ? "SEIER!" : `${x.nombre} holdt stand`),
+      h("p", null, `${riktige} av 10 riktig (${pct} %). ${x.nombre}s beste: ${beste} %.`),
+      !r.ok ? h("p", { class: "dim" }, "Ingen internett, eller duellen er ikke i gang. Ingenting er tapt: prøv igjen senere.")
+        : vant ? h("p", { class: "botin-cuenta" }, `+${bytte} gull fra ${x.nombre}`)
+          : h("p", { class: "dim" }, `${x.nombre} får 20 gull for forsvaret. Øv mer og prøv i morgen!`),
+      h("button", { class: "btn oro grande", onclick: res }, "Tilbake til leiren ⏎")));
+    TECLAS.enter = res;
+  });
+  pintarCampamento();
+}
+/* Ataques recibidos (los trae duelo.py): se quita o se da el oro una sola vez y se avisa. */
+async function sjekkAngrep() {
+  if (!J.nombre || enAsalto || $(".fondo")) return;
+  const d = await hentDuelo(), L = (d && d.amigos && d.amigos.angrep) || [];
+  J.angrepSett = J.angrepSett || [];
+  const nye = L.filter(a => !J.angrepSett.includes(a.id));
+  if (!nye.length || enAsalto || $(".fondo")) return;
+  J.hevn = J.hevn || {};
+  for (const a of nye) {
+    J.angrepSett.push(a.id);
+    if (a.vant) {
+      a.tap = Math.min(a.gull, J.oro); J.oro -= a.tap;
+      J.skjold = Math.max(J.skjold || 0, (a.t + 86400) * 1000);
+      if (!a.hevn) J.hevn[a.fra] = { navn: a.navn, til: (a.t + 86400) * 1000 };
+    } else J.oro += a.gull;
+  }
+  J.angrepSett = J.angrepSett.slice(-60); guardar(); pintarCampamento();
+  const tapt = nye.some(a => a.vant);
+  if (tapt) SFX.derrota(); else SFX.victoria();
+  const cerrar = modal(plano(ic("crossed-swords", "xg"), h("h2", null, "⚔️ Vennetokt!"),
+    nye.map(a => h("div", { class: "evento" }, a.vant ? `${a.navn} angrep leiren din${a.hevn ? " (hevn)" : ""} og tok ${a.tap} gull.` : `${a.navn} angrep, men du holdt stand! +${a.gull} gull.`)),
+    tapt ? h("p", { class: "dim" }, "🛡️ Du har skjold i 24 timer.") : null,
+    h("div", { class: "fila centro", style: "margin-top:14px" },
+      nye.some(a => a.vant && !a.hevn) ? h("button", { class: "btn rojo grande", onclick: () => { cerrar(); abrirVenner(); } }, "⚔️ HEVN") : null,
+      h("button", { class: "btn", onclick: () => cerrar() }, "Lukk"))));
+  TECLAS.enter = () => cerrar();
 }
 /* Oppdatering inne i spillet (Elena, 20 oct): el servidor mira version.json en GitHub y lanza actualizar.ps1. */
 let OPPD = null;     // { local, remoto }
@@ -1248,6 +1378,7 @@ async function resultado(m, st) {
   const mitad = (J.dias[t] || 0) >= 3;      // desde el 4.º tokt del día, la mitad (que no se queme)
   const oro = Math.round(st.oro * (1 + 0.1 * (J.edif.salon - 1)) * (mitad ? 0.5 : 1));
   J.dias[t] = (J.dias[t] || 0) + 1; J.misiones[m.id] = (J.misiones[m.id] || 0) + 1;
+  J.beste = J.beste || {}; J.beste[m.id] = Math.max(J.beste[m.id] || 0, Math.round(pct * 100));     // su defensa en el vennetokt
   J.oro += oro; J.lp += lp; if (primera) J.fuego = null; guardar();
   const rDespues = rango(J.lp), sube = rDespues.i > rAntes.i;
   // semana perfecta: 5 de 5 de lunes a viernes (cuenta para la liga)
@@ -1382,6 +1513,8 @@ async function arrancar() {
   if (/[?&]tokt=1/.test(location.search) && !ev.length) { history.replaceState(null, "", location.pathname); asaltar(ES.misiones[1]); return; }   // viene del aviso de las 20:00
   setTimeout(cuerno, 1500);
   if (await sjekkOppdatering() && nyVersjon() && !enAsalto && !$(".fondo")) { pintarCampamento(); tilbyOppdatering(); }
+  sjekkAngrep();
+  setInterval(sjekkAngrep, 5 * 60e3);
 }
 arrancar();
 

@@ -10,6 +10,9 @@ Cada PC lo tiene en marcha en segundo plano:
   Usa ntfy.sh (gratis, sin cuentas): el código es la «contraseña» del canal. Solo se envía nombre,
   idioma y lecciones de la semana. ntfy.sh guarda los mensajes 12 h: cada PC se vuelve a anunciar cada 3 h.
 - AMIGOS (20 oct): cada jugador tiene su código de amigo; quien lo añade le ve en su lista (como Clash Royale).
+- VENNETOKT (20 oct, plan aprobado por Elena): en el juego de español se puede atacar a un amigo con un examen corto.
+  El juego manda el resultado (POST /vennetokt) al canal del amigo; su duelo lo recoge del suyo y su juego quita
+  o da el oro. Quien recibe un ataque ganado tiene escudo 24 h y el atacante pasa a su lista (para la venganza).
 
 Uso:
   pythonw duelo.py --app es --progreso "D:/ElaraAI/Elara/espanol/progreso.json"      (el juego de español)
@@ -37,6 +40,8 @@ CARPETA = os.path.dirname(os.path.abspath(__file__))
 ESTADO = os.path.join(CARPETA, "duelo.json")
 MINIMO = 5
 APP_LIGA = "liga-vikingo-1"
+APP_ANGREP = "vennetokt-1"
+SKJOLD = 24 * 3600
 NTFY = "https://ntfy.sh"
 ALFABETO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"      # sin 0/O, 1/I/L: se leen mal
 ANUNCIO_CADA = 3 * 3600
@@ -99,8 +104,26 @@ def mis_datos(app, ruta, nombre):
         ini = date.fromisoformat(inicio) if inicio else None
     except ValueError:
         ini = None
-    return {"nombre": nombre, "idioma": app, "semana": lun.isoformat(), "hechos": hechos,
-            "minimo": minimo_de(ini, lun) if p else MINIMO, "uker": semanas_cumplidas(app, p, ini, hoy)}
+    d = {"nombre": nombre, "idioma": app, "semana": lun.isoformat(), "hechos": hechos,
+         "minimo": minimo_de(ini, lun) if p else MINIMO, "uker": semanas_cumplidas(app, p, ini, hoy)}
+    if app == "es" and p:     # lo que necesita un amigo para atacar (vennetokt)
+        hechas = [int(k) for k, v in (p.get("misiones") or {}).items() if str(k).isdigit() and v]
+        d["tokt"] = {"gull": int(p.get("oro", 0)), "pal": int((p.get("edif") or {}).get("empalizada", 1)),
+                     "oppdrag": max(hechas) if hechas else 0, "beste": {str(k): int(v) for k, v in (p.get("beste") or {}).items()},
+                     "skjold": int((p.get("skjold") or 0) / 1000)}
+    return d
+
+
+def tokt_limpio(t):
+    """Datos de vennetokt de un amigo, revisados (vienen de internet)."""
+    if not isinstance(t, dict):
+        return None
+    try:
+        return {"gull": max(0, int(t.get("gull", 0))), "pal": max(1, min(20, int(t.get("pal", 1)))), "oppdrag": max(0, int(t.get("oppdrag", 0))),
+                "beste": {str(k)[:3]: max(0, min(100, int(v))) for k, v in list((t.get("beste") or {}).items())[:50]},
+                "skjold": int(t.get("skjold", 0))}
+    except (TypeError, ValueError, AttributeError):
+        return None
 
 
 def tema(codigo):
@@ -134,6 +157,7 @@ class Duelo:
         self.estado.setdefault("amigos", {"mi_codigo": codigo_nuevo(), "lista": {}, "publicado": 0, "firma": ""})   # lista: {codigo: datos}
         self.ntfy = NTFY
         self.ya_mirado = 0
+        self.pedir_amigos = True      # mirar amigos y buzón ya (el juego abrió la lista, o se añadió alguien)
         self.despertar = threading.Event()
         self.cand = threading.Lock()
         self.guardar()
@@ -180,8 +204,8 @@ class Duelo:
     # ---------------- amigos ----------------
     def tabla_amigos(self, yo):
         A = self.estado["amigos"]
-        if A["lista"] and time.time() - self.ya_mirado > 60:
-            self.ya_mirado = 0
+        if time.time() - A.get("mirado", 0) > 60:     # el juego mira la lista: refrescar (como mucho 1 vez por minuto)
+            self.pedir_amigos = True
             self.despertar.set()
         filas = []
         for c, m in A["lista"].items():
@@ -190,7 +214,59 @@ class Duelo:
                 f.update(hechos=0, semana=yo["semana"])
             filas.append(f)
         filas.sort(key=lambda f: (-f.get("hechos", 0), -f.get("uker", 0), f.get("nombre", "")))
-        return {"mi_codigo": A["mi_codigo"], "lista": filas}
+        return {"mi_codigo": A["mi_codigo"], "lista": filas, "angrep": A.get("angrep", []), "skjold": A.get("skjold", 0)}
+
+    def vennetokt(self, kode, vant, gull, hevn):
+        """Manda el resultado de un ataque al canal del amigo (él lo recoge con su duelo)."""
+        c = codigo_valido(kode)
+        if not c:
+            return {"ok": False, "error": "codigo"}
+        A = self.estado["amigos"]
+        msg = {"app": APP_ANGREP, "id": uuid.uuid4().hex, "fra": A["mi_codigo"], "navn": self.yo()["nombre"], "til": c,
+               "vant": bool(vant), "gull": max(0, min(150, int(gull))), "hevn": bool(hevn)}
+        try:
+            self._http(f"{self.ntfy}/{tema_amigo(c)}", json.dumps(msg, ensure_ascii=False).encode("utf-8"))
+        except (urllib.error.URLError, socket.timeout, OSError):
+            return {"ok": False, "error": "red"}
+        if vant:      # ya tiene escudo: que no le ataque nadie más hasta que se vea
+            with self.cand:
+                if c in A["lista"]:
+                    A["lista"][c]["skjold_visto"] = time.time() + SKJOLD
+                    self.guardar()
+        return {"ok": True}
+
+    def mirar_buzon(self):
+        """Ataques que han llegado a MI canal: se guardan para el juego; si ganaron, escudo de 24 h."""
+        A = self.estado["amigos"]
+        texto = self._http(f"{self.ntfy}/{tema_amigo(A['mi_codigo'])}/json?poll=1&since={A.get('buzon') or '12h'}")
+        nuevo = False
+        with self.cand:
+            vistos = {a["id"] for a in A.setdefault("angrep", [])}
+            for linea in texto.splitlines():
+                try:
+                    ev = json.loads(linea)
+                    d = json.loads(ev.get("message", "")) if ev.get("event") == "message" else None
+                except ValueError:
+                    continue
+                A["buzon"] = ev.get("id") or A.get("buzon")
+                if not d or d.get("app") != APP_ANGREP or d.get("til") != A["mi_codigo"] or str(d.get("id", "")) in vistos:
+                    continue
+                fra = codigo_valido(d.get("fra"))
+                if not fra or fra == A["mi_codigo"]:
+                    continue
+                t = ev.get("time", time.time())
+                a = {"id": str(d["id"])[:40], "fra": fra, "navn": str(d.get("navn", "?"))[:30], "vant": bool(d.get("vant")),
+                     "gull": max(0, min(150, int(d.get("gull", 0)))), "hevn": bool(d.get("hevn")), "t": t}
+                A["angrep"].append(a)
+                vistos.add(a["id"])
+                A["lista"].setdefault(fra, {"nombre": a["navn"], "hechos": 0, "minimo": MINIMO, "uker": 0, "semana": "", "visto": 0})
+                if a["vant"]:
+                    A["skjold"] = max(A.get("skjold", 0), t + SKJOLD)
+                nuevo = True
+            A["angrep"] = A["angrep"][-30:]
+            if nuevo:
+                A["firma"] = ""       # publicar ya el escudo
+            self.guardar()
 
     def amigo(self, accion, codigo):
         c = codigo_valido(codigo)
@@ -205,7 +281,7 @@ class Duelo:
             elif accion == "quitar":
                 A["lista"].pop(c, None)
             self.guardar()
-        self.ya_mirado = 0
+        self.pedir_amigos = True
         self.despertar.set()
         return {"ok": True}
 
@@ -248,17 +324,23 @@ class Duelo:
     def bucle_amigos(self):
         A = self.estado["amigos"]
         yo = self.yo()
-        firma = json.dumps([yo["semana"], yo["hechos"], yo["minimo"], yo["uker"], yo["nombre"]])
+        if "tokt" in yo:
+            yo["tokt"]["skjold"] = int(max(yo["tokt"]["skjold"], A.get("skjold", 0)))
+        t = yo.get("tokt") or {}
+        firma = json.dumps([yo["semana"], yo["hechos"], yo["minimo"], yo["uker"], yo["nombre"],
+                            t.get("gull", 0) // 50, t.get("pal"), t.get("oppdrag"), t.get("beste"), t.get("skjold", 0) > time.time()])
         if firma != A.get("firma") or time.time() - A.get("publicado", 0) > ANUNCIO_CADA:
             msg = json.dumps(dict(yo, app=APP_LIGA, id=self.id), ensure_ascii=False).encode("utf-8")
             self._http(f"{self.ntfy}/{tema_amigo(A['mi_codigo'])}", msg)
             with self.cand:
                 A["firma"], A["publicado"] = firma, time.time()
                 self.guardar()
-        if A["lista"] and time.time() - A.get("mirado", 0) > MIRAR_CADA or (A["lista"] and self.ya_mirado == 0):
+        if time.time() - A.get("mirado", 0) > MIRAR_CADA or self.pedir_amigos:
+            self.pedir_amigos = False
+            self.mirar_buzon()
             for c in list(A["lista"]):
                 texto = self._http(f"{self.ntfy}/{tema_amigo(c)}/json?poll=1&since=12h")
-                ultimo = None
+                ultimo, skjold = None, 0
                 for linea in texto.splitlines():
                     try:
                         ev = json.loads(linea)
@@ -267,13 +349,17 @@ class Duelo:
                         continue
                     if d and d.get("app") == APP_LIGA:
                         ultimo = (d, ev.get("time", time.time()))
+                    elif d and d.get("app") == APP_ANGREP and d.get("til") == c and d.get("vant"):
+                        skjold = max(skjold, ev.get("time", 0) + SKJOLD)     # alguien le ganó: tiene escudo
                 if ultimo:
                     d, t = ultimo
                     with self.cand:
                         if c in A["lista"]:
+                            viejo = A["lista"][c]
                             A["lista"][c] = {"nombre": str(d.get("nombre", "?"))[:30], "idioma": d.get("idioma") if d.get("idioma") in ("es", "no") else "?",
                                              "semana": str(d.get("semana", ""))[:10], "hechos": int(d.get("hechos", 0)), "minimo": int(d.get("minimo", MINIMO)),
-                                             "uker": int(d.get("uker", 0)), "visto": t}
+                                             "uker": int(d.get("uker", 0)), "visto": t, "tokt": tokt_limpio(d.get("tokt")),
+                                             "skjold_visto": max(skjold, viejo.get("skjold_visto", 0))}
             with self.cand:
                 A["mirado"] = time.time()
                 self.guardar()
@@ -396,12 +482,14 @@ def servir(duelo, puerto):
 
         def do_POST(self):
             ruta = self.path.split("?")[0]
-            if ruta not in ("/liga", "/amigo"):
+            if ruta not in ("/liga", "/amigo", "/vennetokt"):
                 return self._json({"error": "no"}, 404)
             try:
                 d = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)).decode("utf-8"))
             except (ValueError, UnicodeDecodeError):
                 return self._json({"error": "formato"}, 400)
+            if ruta == "/vennetokt":
+                return self._json(duelo.vennetokt(str(d.get("kode", "")), d.get("vant"), d.get("gull", 0), d.get("hevn")))
             if ruta == "/amigo":
                 if d.get("accion") not in ("anadir", "quitar"):
                     return self._json({"error": "accion"}, 400)
