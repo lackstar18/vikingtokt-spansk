@@ -154,6 +154,8 @@ h2 { font-size: 1.25em; color: var(--oro); }
 input[type=range] { width: 220px; accent-color: var(--oro); }
 .creditos { font-size: .8em; color: var(--dim); text-align: left; max-height: 40vh; overflow: auto; }
 
+.liga-kode { font-family: var(--titulo); letter-spacing: .08em; color: var(--oro2); font-size: 1.15em; }
+
 @media (max-width: 600px) {
   body { font-size: 16px; }
   .opciones { grid-template-columns: 1fr; }

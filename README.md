@@ -17,6 +17,14 @@ Dobbeltklikk **Actualizar.bat**. Fremgangen din blir liggende.
 - Snarvei «Vikingtokt» på skrivebordet.
 - Fjern alt med **Desinstalar.bat**.
 
+## Liga med venner (over internett)
+1. Én av dere trykker **Lag en liga** nederst i leiren (Duell). Da får du en kode, for eksempel `K7M4-QX2P`.
+2. Del koden med vennene dine.
+3. De skriver koden og trykker **Bli med i en liga** i sitt spill.
+
+Alle ser tabellen: denne uka (x/5) og 🏆 = uker der de nådde minimumet.
+Ligaen bruker [ntfy.sh](https://ntfy.sh) (gratis, uten konto). Bare navn, språk og leksjoner denne uka blir sendt. Koden er «passordet»: del den bare med vennene dine.
+
 ## DeepSeek (valgfritt)
 Lag filen `clave_deepseek.txt` i spillmappen med API-nøkkelen. Uten nøkkel hopper spillet over bonusen.
 

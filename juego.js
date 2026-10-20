@@ -292,18 +292,44 @@ function pintarCampamento() {
 }
 
 /* Duelo por la red de casa: duelo.py (en este PC) dice cómo va cada uno esta semana. */
-async function pintarDuelo(caja) {
+const DUELO = "http://127.0.0.1:8770";
+async function ligaAccion(accion, codigo) {
+  try { return await (await fetch(DUELO + "/liga", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accion, codigo: codigo || "" }) })).json(); }
+  catch (e) { return { ok: false, error: "red" }; }
+}
+/* Duelo en casa (LAN) y liga por internet con un código (duelo.py en este PC). */
+const plano = (...x) => x.flat(Infinity).filter(y => y != null && y !== false);
+async function pintarDuelo(caja, otraVez) {
   let d = null;
-  try { const c = new AbortController(); setTimeout(() => c.abort(), 1500); d = await (await fetch("http://127.0.0.1:8770/duelo", { cache: "no-store", signal: c.signal })).json(); } catch (e) { }
+  try { const c = new AbortController(); setTimeout(() => c.abort(), 1500); d = await (await fetch(DUELO + "/duelo", { cache: "no-store", signal: c.signal })).json(); } catch (e) { }
   const info = caja.lastChild; info.innerHTML = "";
-  const fila = (n, x) => h("div", { style: "margin-top:6px" }, h("div", { class: "fila entre" }, h("b", null, n), h("span", null, `${x.hechos}/${x.minimo}`, x.hechos >= x.minimo ? " ✅" : "")),
+  const repintar = () => pintarDuelo(caja, true);
+  const fila = (n, x, der) => h("div", { style: "margin-top:6px" }, h("div", { class: "fila entre" }, h("b", null, n), h("span", null, `${x.hechos}/${x.minimo}`, x.hechos >= x.minimo ? " ✅" : "", der || "")),
     h("div", { class: "barra" }, h("i", { style: `width:${Math.min(100, x.hechos / Math.max(1, x.minimo) * 100)}%` })));
-  if (!d) { info.append(h("h2", null, "Duell: du mot Elena"), h("div", { class: "dim" }, "Duellen er ikke i gang. Åpne spillet med «Vikingtokt» på skrivebordet.")); return; }
+  if (!d) { info.append(...plano(h("h2", null, "Duell og liga"), h("div", { class: "dim" }, "Duellen er ikke i gang. Åpne spillet med «Vikingtokt» på skrivebordet."))); return; }
+  if (d.liga) {
+    const L = d.liga;
+    const kopier = h("button", { class: "btn chico", onclick: async e => { try { await navigator.clipboard.writeText(L.codigo); e.target.textContent = "Kopiert ✓"; } catch (err) { } } }, "📋 Kopier");
+    info.append(...plano(h("div", { class: "fila entre" }, h("h2", null, "🏆 Liga"), h("span", { class: "fila" }, h("b", { class: "liga-kode" }, L.codigo), kopier)),
+      h("div", { class: "faint" }, "Gi koden til vennene dine. De skriver den inn i sitt spill (Duell → «Bli med i en liga»). Alle som når ukeminimumet vinner uka."),
+      L.miembros.map((x, i) => fila(`${["🥇", "🥈", "🥉"][i] || (i + 1) + "."} ${x.nombre}${x.yo ? " (deg)" : ""} · ${x.idioma === "no" ? "norsk" : "spansk"}`, x, ` · 🏆 ${x.uker || 0}`)),
+      L.miembros.length < 2 ? h("p", { class: "dim" }, "Ingen andre ennå. Del koden!") : null,
+      L.en_linea === false ? h("p", { class: "faint" }, "⚠️ Ingen internett akkurat nå: viser det siste vi vet.") : null,
+      h("div", { class: "fila", style: "margin-top:10px" }, h("span", { class: "faint" }, "🏆 = uker der de nådde minimumet."),
+        h("button", { class: "btn chico", onclick: async () => { if (confirm("Forlate ligaen?")) { await ligaAccion("salir"); repintar(); } } }, "Forlat ligaen"))));
+    if (!otraVez) setTimeout(repintar, 4000);   // la primera vez trae a los demás en unos segundos
+    return;
+  }
   const m = d.marcador || { yo: 0, rival: 0 };
-  info.append(h("div", { class: "fila entre" }, h("h2", null, `Duell: du mot ${d.rival ? d.rival.nombre : "Elena"}`), h("span", { class: "dim", title: "Uker vunnet" }, `Stilling ${m.yo}–${m.rival}`)),
-    h("div", { class: "faint" }, "Du lærer spansk, hun lærer norsk. Den som når ukeminimumet (5/5) vinner uka."),
+  info.append(...plano(h("div", { class: "fila entre" }, h("h2", null, `Duell: du mot ${d.rival ? d.rival.nombre : "Elena"}`), h("span", { class: "dim", title: "Uker vunnet" }, `Stilling ${m.yo}–${m.rival}`)),
+    h("div", { class: "faint" }, "Hjemme (samme wifi). Den som når ukeminimumet (5/5) vinner uka."),
     fila(J.nombre, d.yo), d.rival ? fila(d.rival.nombre, d.rival)
-      : h("p", { class: "dim" }, "Elena er ikke sett ennå. Begge PC-ene må være på samme wifi, med appen hennes eller duellen i gang."));
+      : h("p", { class: "dim" }, "Elena er ikke sett ennå. Begge PC-ene må være på samme wifi, med appen hennes eller duellen i gang.")));
+  const kode = h("input", { class: "resp", placeholder: "Kode, f.eks. K7M4-QX2P", maxlength: 12, style: "max-width:240px;font-size:1em;padding:8px 12px", autocomplete: "off" });
+  const feil = h("span", { class: "faint" });
+  info.append(...plano(h("h3", { style: "margin-top:14px" }, "🏆 Liga med venner (over internett)"),
+    h("div", { class: "fila" }, h("button", { class: "btn chico oro", onclick: async () => { const r = await ligaAccion("crear"); if (r.ok) pintarDuelo(caja); else feil.textContent = "Fikk ikke laget ligaen."; } }, "Lag en liga"),
+      kode, h("button", { class: "btn chico", onclick: async () => { const r = await ligaAccion("unirse", kode.value); if (r.ok) pintarDuelo(caja); else feil.textContent = r.error === "codigo" ? "Feil kode. Den har 8 tegn, f.eks. K7M4-QX2P." : "Fikk ikke koblet til."; } }, "Bli med i en liga"), feil)));
 }
 function inventario() {
   const lista = J.inv.map(id => BOTIN.find(b => b.id === id)).filter(Boolean);
