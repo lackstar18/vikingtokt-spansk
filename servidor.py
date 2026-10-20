@@ -149,14 +149,15 @@ def version_remota(fresca=False):
 
 
 def oppdatere():
-    """Lanza actualizar.ps1 escondido; al acabar, él mismo vuelve a abrir el servidor."""
+    """Lanza actualizar.ps1 escondido y se cierra; al acabar, el script vuelve a abrir el servidor ya nuevo."""
     try:
         subprocess.Popen(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden",
                           "-File", os.path.join(CARPETA, "actualizar.ps1"), "-FraSpillet", "-Python", pythonw()],
                          cwd=CARPETA, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        return True
     except OSError:
         return False
+    threading.Timer(1.5, lambda: os._exit(0)).start()     # deja contestar al juego y suelta el puerto
+    return True
 
 
 def lanzar_duelo():
@@ -242,12 +243,20 @@ def vigilar(srv):
 def main():
     abrir = "--sin-navegador" not in sys.argv
     url = f"http://127.0.0.1:{PUERTO}/" + ("?tokt=1" if "--tokt" in sys.argv else "")
-    try:
-        srv = ThreadingHTTPServer(("127.0.0.1", PUERTO), Manejador)
-    except OSError:
-        if abrir:   # ya está abierto: solo abrir la pestaña
-            webbrowser.open(url)
-        return
+    # en Windows, sin esto dos servidores pueden quedarse con el mismo puerto
+    ThreadingHTTPServer.allow_reuse_address = os.name != "nt"
+    intentos = 1 if abrir else 15        # tras actualizar, espera a que el viejo suelte el puerto
+    for i in range(intentos):
+        try:
+            srv = ThreadingHTTPServer(("127.0.0.1", PUERTO), Manejador)
+            break
+        except OSError:
+            if i + 1 < intentos:
+                time.sleep(1)
+                continue
+            if abrir:   # ya está abierto: solo abrir la pestaña
+                webbrowser.open(url)
+            return
     threading.Thread(target=vigilar, args=(srv,), daemon=True).start()
     if "--sin-duelo" not in sys.argv:
         threading.Thread(target=lanzar_duelo, daemon=True).start()
