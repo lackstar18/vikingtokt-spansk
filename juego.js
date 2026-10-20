@@ -251,39 +251,78 @@ function arte(n, id) {
   if (CON_TONO.has(n)) return K(n + TONOS[(J.colores || {})[id || (HUS.has(n) ? "hus" : n)] || 0]);
   return K(n);
 }
-/* Zona de adornos por cuadros (Elena, 20 oct: «una zona modular por cuadros donde puedan poner las decoraciones que quieran»). */
-const ZONA = { x: 1000, y: 668, cols: 6, filas: 3, c: 64 };
-const PYNT = [
-  { id: "pino", n: "Gran", p: 15, t: 70 }, { id: "arbol", n: "Tre", p: 15, t: 66 }, { id: "arbusto", n: "Busk", p: 10, t: 54 },
-  { id: "arbusto2", n: "Bærbusk", p: 12, t: 54 }, { id: "roca2", n: "Stein", p: 10, t: 56 }, { id: "roca", n: "Steinrøys", p: 20, t: 64 },
-  { id: "tronco", n: "Tømmerstokk", p: 10, t: 60 }, { id: "campo", n: "Åker", p: 20, t: 64, tile: true }, { id: "campo2", n: "Kornåker", p: 20, t: 64, tile: true },
-  { id: "pozo", n: "Brønn", p: 40, t: 62 }, { id: "fuego", n: "Bål", p: 25, t: 46 }, { id: "tienda", n: "Telt", p: 35, t: 68 },
-  { id: "choza", n: "Hytte", p: 50, t: 68 }, { id: "cobre", n: "Kobberåre", p: 40, t: 62 }, { id: "oro", n: "Gullåre", p: 60, t: 62 },
-  { id: "estatua", n: "Statue", p: 80, t: 56 },
+/* Pueblo en cuadrícula (Elena, 20 oct: «la cuadrícula es el pueblo entero: ellos eligen dónde colocar las cosas, como Clash of Clans»). */
+const CELDA = 40, REJ = { x: 200, y: 80, cols: 40, filas: 20 };     // zona edificable: x 200-1800, y 80-880
+const MUNDO = { w: 2000, h: 1250 };
+const PARCELAS = [
+  { id: "salon", img: "salon", n: "Langhuset" }, { id: "empalizada", img: "muralla", n: "Palisaden" },
+  { id: "forja", img: "forja", n: "Smia" }, { id: "molino", img: "molino", n: "Mølla" },
+  { id: "taberna", img: "taberna", n: "Tavernaen", bloq: 3, txt: "mat og drikke" }, { id: "mercado", img: "mercado", n: "Markedet", bloq: 5, txt: "tall og priser" },
 ];
-let modoBygg = false, pyntValgt = null;
+const TIPOS = {
+  salon: { w: 5, h: 4, px: 240, edif: "salon" }, puerta: { w: 5, h: 2, px: 215, edif: "empalizada" },
+  forja: { w: 4, h: 3, px: 170, edif: "forja" }, molino: { w: 3, h: 3, px: 150, edif: "molino" },
+  taberna: { w: 3, h: 3, px: 140, edif: "taberna" }, mercado: { w: 4, h: 3, px: 165, edif: "mercado" },
+  muro: { muro: true, n: "Palisade" },
+  casa1: { w: 2, h: 2, px: 96, n: "Hus", p: 60 }, casa2: { w: 2, h: 2, px: 96, n: "Hus", p: 60 }, casa3: { w: 2, h: 2, px: 100, n: "Steinhus", p: 80 },
+  granero: { w: 3, h: 2, px: 122, n: "Låve", p: 70 }, tienda: { w: 2, h: 2, px: 76, n: "Telt", p: 35 }, choza: { w: 2, h: 2, px: 78, n: "Hytte", p: 50 },
+  campo: { w: 2, h: 2, px: 80, plano: true, n: "Åker", p: 20 }, campo2: { w: 2, h: 2, px: 80, plano: true, n: "Kornåker", p: 20 },
+  pino: { px: 62, n: "Gran", p: 15 }, arbol: { px: 56, n: "Tre", p: 15 }, arbusto: { px: 44, n: "Busk", p: 10 }, arbusto2: { px: 44, n: "Bærbusk", p: 12 },
+  roca2: { px: 44, n: "Stein", p: 10 }, roca: { px: 54, n: "Steinrøys", p: 20 }, tronco: { px: 48, n: "Tømmerstokk", p: 10 },
+  pozo: { px: 50, n: "Brønn", p: 40 }, fuego: { px: 38, n: "Bål", p: 25 }, cobre: { px: 50, n: "Kobberåre", p: 40 },
+  oro: { px: 50, n: "Gullåre", p: 60 }, estatua: { px: 46, n: "Statue", p: 80 },
+};
+const TIENDA = ["muro", "pino", "arbol", "arbusto", "arbusto2", "roca2", "roca", "tronco", "campo", "campo2", "pozo", "fuego", "tienda", "choza", "casa1", "casa2", "casa3", "granero", "cobre", "oro", "estatua"];
+const tipo = t => Object.assign({ w: 1, h: 1, img: t }, TIPOS[t], TIPOS[t] && TIPOS[t].edif ? { img: PARCELAS.find(p => p.id === TIPOS[t].edif).img } : {});
+let modoBygg = false, pyntValgt = null, seleccion = null;
 function pynt() { J.pynt = J.pynt || { lager: {}, plassert: [] }; return J.pynt; }
-const MUNDO = { w: 1600, h: 1150 };
-const PARCELAS = [   // x, y = pie del edificio; t = ancho en px del mundo
-  { id: "salon", img: "salon", n: "Langhuset", x: 800, y: 560, t: 240 },
-  { id: "empalizada", img: "muralla", n: "Palisaden", x: 800, y: 845, t: 220 },
-  { id: "forja", img: "forja", n: "Smia", x: 495, y: 640, t: 165 },
-  { id: "molino", img: "molino", n: "Mølla", x: 430, y: 390, t: 165 },
-  { id: "taberna", img: "taberna", n: "Tavernaen", x: 1100, y: 650, t: 150, bloq: 3, txt: "mat og drikke" },
-  { id: "mercado", img: "mercado", n: "Markedet", x: 1120, y: 400, t: 165, bloq: 5, txt: "tall og priser" },
-];
+function mapaInicial() {
+  const o = [["salon", 17, 7], ["puerta", 17, 17], ["forja", 9, 10], ["molino", 9, 3], ["taberna", 27, 11], ["mercado", 27, 4],
+    ["casa1", 14, 4], ["casa2", 24, 8], ["casa3", 13, 13], ["granero", 4, 10], ["campo", 5, 5], ["campo2", 5, 7], ["pozo", 16, 13], ["arbusto", 23, 4], ["pino", 33, 9], ["arbol", 34, 14]];
+  for (let c = 11; c <= 16; c++) o.push(["muro", c, 18]);
+  for (let c = 22; c <= 27; c++) o.push(["muro", c, 18]);
+  return { v: 1, sig: o.length + 1, objs: o.map(([t, c, r], i) => ({ u: i + 1, t, c, r })) };
+}
+function mapa() {
+  if (!J.mapa) {
+    J.mapa = mapaInicial();
+    const P = pynt(); for (const x of P.plassert || []) P.lager[x.id] = (P.lager[x.id] || 0) + 1;   // lo de la zona vieja, al lager
+    P.plassert = []; guardar();
+  }
+  return J.mapa;
+}
+const limiteMuro = () => 12 + 8 * ((J.edif.empalizada || 1) - 1);
+const murosPuestos = () => mapa().objs.filter(o => o.t === "muro").length;
+function ocupadas(excepto) {
+  const s = new Set();
+  for (const o of mapa().objs) {
+    if (o === excepto) continue;
+    const T = tipo(o.t);
+    for (let i = 0; i < T.w; i++) for (let j = 0; j < T.h; j++) s.add((o.c + i) + "," + (o.r + j));
+  }
+  return s;
+}
+function cabe(t, c, r, excepto) {
+  const T = tipo(t);
+  if (c < 0 || r < 0 || c + T.w > REJ.cols || r + T.h > REJ.filas) return false;
+  const s = ocupadas(excepto);
+  for (let i = 0; i < T.w; i++) for (let j = 0; j < T.h; j++) if (s.has((c + i) + "," + (r + j))) return false;
+  return true;
+}
+/* dónde va cada cosa en píxeles del mundo */
+function situar(el, t, c, r) {
+  const T = tipo(t), pie = REJ.y + (r + T.h) * CELDA;
+  if (T.muro || T.plano) { el.style.left = REJ.x + c * CELDA + "px"; el.style.top = REJ.y + r * CELDA + "px"; el.style.zIndex = T.plano ? 1 : pie; return; }
+  el.style.left = REJ.x + (c + T.w / 2) * CELDA + "px"; el.style.top = pie - (T.edif ? 0 : 4) + "px"; el.style.zIndex = pie;
+}
 const MOLINO_HORA = 6, MOLINO_MAX = 48;      // oro por hora y tope del molino
 function semilla(n) { return () => { n = (n * 9301 + 49297) % 233280; return n / 233280; }; }
-function decorado() {
+function bosque() {     // árboles alrededor de la zona edificable (no estorban)
   const out = [], r = semilla(7);
-  const fijos = [["casa1", 640, 400, 105], ["casa2", 975, 470, 105], ["casa3", 640, 780, 110], ["pozo", 700, 690, 70],
-    ["granero", 300, 600, 120], ["roca", 1300, 560, 80], ["oro", 1300, 520, 90], ["tronco", 560, 860, 70], ["arbusto", 900, 300, 55], ["arbusto", 720, 320, 50]];
-  for (const [img, x, y, t] of fijos) out.push({ img, x, y, t });
-  for (const [x, y] of [[300, 430], [360, 430], [300, 490], [360, 490]]) out.push({ img: "campo", x, y, t: 64, tile: true });
-  for (let i = 0; i < 70; i++) {      // bosque alrededor, fuera del pueblo y del mar
-    const x = 40 + r() * 1520, y = 60 + r() * 800, dx = (x - 800) / 560, dy = (y - 560) / 360;
-    if (dx * dx + dy * dy < 1 || y > 830) continue;
-    out.push({ img: ["pino", "arbol", "pino2", "arbol2", "pino"][Math.floor(r() * 5)], x, y, t: 70 + r() * 40 });
+  for (let i = 0; i < 160; i++) {
+    const x = 20 + r() * 1960, y = 30 + r() * 870;
+    if (x > REJ.x - 20 && x < REJ.x + REJ.cols * CELDA + 20 && y > REJ.y - 10) continue;
+    out.push({ img: ["pino", "arbol", "pino2", "arbol2", "pino"][Math.floor(r() * 5)], x, y, t: 64 + r() * 40 });
   }
   return out.sort((a, b) => a.y - b.y);
 }
@@ -299,46 +338,34 @@ function recogerMolino(cerca) {
 }
 let vistaMapa = null;    // {s, x, y}: se recuerda al volver al campamento
 function flotaMapa(el, txt) { const f = h("div", { class: "flota oro", style: "left:50%;top:0" }, txt); el.append(f); setTimeout(() => f.remove(), 950); }
+function aviso2(txt) { const a = h("div", { class: "aviso-mapa" }, txt); document.body.append(a); setTimeout(() => a.remove(), 2400); }
 
 function pintarCampamento() {
   terminarMejoras();
   const r = rango(J.lp), t = hoy(), finde = esFinde(t), hecho = hechasHoy() > 0;
   const titulo = J.equipo.titulo ? BOTIN.find(b => b.id === J.equipo.titulo).titulo : "Vikingkriger";
   const lun = lunesDe(t), hechasSemana = [0, 1, 2, 3, 4].filter(i => J.dias[masDias(lun, i)] > 0).length;
-  const m = ES.misiones[1];
+  const m = ES.misiones[1], M = mapa();
 
   // ---- el mundo ----
   const mundo = h("div", { class: "mundo" + (modoBygg ? " bygg" : ""), style: `width:${MUNDO.w}px;height:${MUNDO.h}px;background-color:${tema().fondo};background-image:url(${arte("hierba")})` },
-    h("div", { class: "playa" }), h("div", { class: "mar" }));
-  const pon = (o, clase) => { const el = h("img", { class: "objeto-mapa " + (clase || ""), src: arte(o.img), alt: "", draggable: "false",
-    style: `left:${o.x}px;top:${o.y}px;width:${o.t}px` + (o.tile ? ";transform:translate(-50%,-50%)" : "") }); mundo.append(el); return el; };
-  decorado().forEach(o => pon(o));
-  // barco vikingo en la playa y, si hoy toca y no ha jugado, el barco del capitán acercándose
-  mundo.append(h("div", { class: "barco", style: "left:470px;top:960px" }, ic("drakkar", "", "#6b4a2b")));
+    h("div", { class: "playa", style: "top:905px" }), h("div", { class: "mar", style: "top:975px" }));
+  if (modoBygg) mundo.append(h("div", { class: "rejilla-bygg", style: `left:${REJ.x}px;top:${REJ.y}px;width:${REJ.cols * CELDA}px;height:${REJ.filas * CELDA}px` }));
+  for (const o of bosque()) mundo.append(h("img", { class: "objeto-mapa", src: arte(o.img), alt: "", draggable: "false", style: `left:${o.x}px;top:${o.y}px;width:${o.t}px` }));
+  mundo.append(h("div", { class: "barco", style: "left:640px;top:1070px" }, ic("drakkar", "", "#6b4a2b")));
   if (!finde && !hecho) {
     const avance = Math.min(1, (new Date().getHours() + new Date().getMinutes() / 60) / 24);
-    mundo.append(h("div", { class: "barco enemigo", style: `left:${1480 - avance * 420}px;top:${960 + avance * 10}px`, title: "Capitán Rodrigo kommer ved midnatt" }, ic("drakkar", "", "#c2413a")));
+    mundo.append(h("div", { class: "barco enemigo", style: `left:${1900 - avance * 480}px;top:${1090 + avance * 10}px`, title: "Capitán Rodrigo kommer ved midnatt" }, ic("drakkar", "", "#c2413a")));
   }
-  // escudo (hoy ya jugó) o fuego (te atacaron y aún no te has vengado)
-  if (hecho && !finde) mundo.append(h("div", { class: "escudo-mapa", style: "left:340px;top:280px;width:920px;height:640px", title: "Skjold: leiren er trygg i dag" }));
-  // edificios
-  for (const P of PARCELAS) {
-    const nivel = J.edif[P.id], bloq = P.bloq && !(J.misiones[P.bloq - 1] > 0) && P.bloq > 1;
-    const el = h("div", { class: "edificio" + (bloq ? " bloq" : ""), style: `left:${P.x}px;top:${P.y}px;width:${P.t}px;z-index:${Math.round(P.y)}` },
-      h("img", { src: arte(P.img, P.id), alt: P.n, draggable: "false" }));
-    if (P.id === "molino") el.append(h("img", { class: "aspas", src: K("aspas"), alt: "", draggable: "false" }));
-    const etiqueta = bloq ? `🔒 ${P.n}` : nivel ? `${P.n} · nv. ${nivel}` : P.n;
-    el.append(h("div", { class: "cartel" }, etiqueta));
-    if (J.mejora && J.mejora.id === P.id) el.append(h("div", { class: "obra" }, "🔨 ", cuenta(J.mejora.fin - Date.now())));
-    if (J.fuego === P.id) el.append(h("img", { class: "fuego-mapa", src: K("fuego"), alt: "", draggable: "false" }), h("img", { class: "fuego-mapa f2", src: K("fuego"), alt: "", draggable: "false" }));
-    if (P.id === "molino" && oroMolino() >= MOLINO_HORA) el.append(h("div", { class: "burbuja-oro", title: "Samle inn" }, ic("two-coins", "", "#e0b04f"), " +" + oroMolino()));
-    el.addEventListener("click", e => { if (vistaMapa && vistaMapa.arrastrado) return; e.stopPropagation(); SFX.madera(); abrirEdificio(P, el); });
-    mundo.append(el);
+  const salon = M.objs.find(o => o.t === "salon");
+  if (hecho && !finde && salon) {
+    const cx = REJ.x + (salon.c + 2.5) * CELDA, cy = REJ.y + (salon.r + 2) * CELDA;
+    mundo.append(h("div", { class: "escudo-mapa", style: `left:${cx - 600}px;top:${cy - 400}px;width:1200px;height:800px`, title: "Skjold: leiren er trygg i dag" }));
   }
-  pintarZona(mundo);
-  // aldeanos y guerreros que pasean
-  const caminantes = [["aldeano", 640, 600], ["aldeana", 900, 640], ["vikingo", 780, 760], ["vikingo2", 560, 480]].map(([img, x, y]) => {
-    const el = h("img", { class: "aldeano", src: K(img), alt: "", draggable: "false", style: `left:${x}px;top:${y}px` }); mundo.append(el); return el; });
+  for (const o of M.objs) mundo.append(objetoMapa(o));
+  if (modoBygg && pyntValgt) prepararColocar(mundo);
+  // aldeanos y guerreros que pasean por casillas libres
+  const caminantes = ["aldeano", "aldeana", "vikingo", "vikingo2"].map(img => { const el = h("img", { class: "aldeano", src: K(img), alt: "", draggable: "false" }); mundo.append(el); return el; });
 
   // ---- HUD encima del mapa ----
   const estado = finde
@@ -350,30 +377,139 @@ function pintarCampamento() {
     h("div", { class: "hud-izq" }, avatar(), h("div", null, h("div", { class: "nombre" }, J.nombre), h("div", { class: "dim", style: "font-size:.85em" }, titulo),
       h("div", { class: "rango", style: `color:${r.c}` }, ic("laurels-trophy", "", r.c), `${r.n} · ${J.lp} LP`),
       h("div", { class: "barra", style: "width:150px", title: r.sig ? `${r.sig.lp - J.lp} LP til ${r.sig.n}` : "Høyeste rang" }, h("i", { style: `width:${Math.round(r.pct * 100)}%` })))),
-    h("div", { class: "hud-centro" }, estado),
+    modoBygg ? null : h("div", { class: "hud-centro" }, estado),
     h("div", { class: "hud-der" }, h("div", { class: "pastilla", title: "Gull" }, ic("two-coins", "", "#e0b04f"), " " + J.oro),
       h("div", { class: "pastilla", title: "Denne uka (man–fre)" }, "📅 " + hechasSemana + "/5"),
       h("button", { class: "btn icono", title: "Innstillinger", onclick: ajustes }, "⚙️")),
     h("div", { class: "hud-abajo-izq" }, h("button", { class: "btn redondo", onclick: abrirVenner, title: "Venner og liga" }, "👥", h("small", null, "Venner")),
       h("button", { class: "btn redondo", onclick: inventario, title: "Smia: byttet ditt" }, "🎒", h("small", null, "Bytte")),
-      h("button", { class: "btn redondo" + (modoBygg ? " activo" : ""), onclick: () => { modoBygg = !modoBygg; pyntValgt = null; if (modoBygg && vistaMapa) centrarZona(); pintarCampamento(); }, title: "Pynt leiren" }, "🛠️", h("small", null, "Pynt")),
+      h("button", { class: "btn redondo" + (modoBygg ? " activo" : ""), onclick: () => { modoBygg = !modoBygg; pyntValgt = null; seleccion = null; pintarCampamento(); }, title: "Bygg: flytt alt i leiren" }, "🛠️", h("small", null, "Bygg")),
       h("button", { class: "btn redondo", onclick: abrirFarger, title: "Farger" }, "🎨", h("small", null, "Farger")),
       h("a", { href: "#", class: "faint", onclick: e => { e.preventDefault(); creditos(); } }, "Kreditter")),
-    h("div", { class: "hud-abajo-der" }, h("button", { class: "btn-tokt", onclick: () => cartaTokt(m) }, "⚔️", h("span", null, hecho ? "NYTT TOKT" : "TOKT"))));
+    modoBygg ? null : h("div", { class: "hud-abajo-der" }, h("button", { class: "btn-tokt", onclick: () => cartaTokt(m) }, "⚔️", h("span", null, hecho ? "NYTT TOKT" : "TOKT"))));
 
-  const mapa = h("div", { class: "mapa" }, mundo);
-  if (modoBygg) hud.append(catalogoPynt());
-  pantalla(mapa, hud);
+  const vista = h("div", { class: "mapa" + (modoBygg ? " modo-bygg" : "") }, mundo);
+  if (modoBygg) hud.append(catalogoBygg());
+  pantalla(vista, hud);
   $("#app").classList.add("pantalla-mapa");
-  montarVista(mapa, mundo);
+  montarVista(vista, mundo);
   pasear(caminantes);
-  TECLAS.enter = () => cartaTokt(m);
+  TECLAS.enter = modoBygg ? () => { modoBygg = false; pyntValgt = null; seleccion = null; pintarCampamento(); } : () => cartaTokt(m);
+}
+/* Un objeto del pueblo: edificio, tramo de empalizada o adorno. */
+function objetoMapa(o) {
+  const T = tipo(o.t);
+  let el;
+  if (T.edif) {
+    const P = PARCELAS.find(p => p.id === T.edif), nivel = J.edif[P.id], bloq = P.bloq && !(J.misiones[P.bloq - 1] > 0) && P.bloq > 1;
+    el = h("div", { class: "edificio" + (bloq ? " bloq" : ""), style: `width:${T.px}px` }, h("img", { src: arte(P.img, P.id), alt: P.n, draggable: "false" }));
+    if (P.id === "molino") el.append(h("img", { class: "aspas", src: K("aspas"), alt: "", draggable: "false" }));
+    el.append(h("div", { class: "cartel" }, bloq ? `🔒 ${P.n}` : nivel ? `${P.n} · nv. ${nivel}` : P.n));
+    if (J.mejora && J.mejora.id === P.id) el.append(h("div", { class: "obra" }, "🔨 ", cuenta(J.mejora.fin - Date.now())));
+    if (J.fuego === P.id) el.append(h("img", { class: "fuego-mapa", src: K("fuego"), alt: "", draggable: "false" }), h("img", { class: "fuego-mapa f2", src: K("fuego"), alt: "", draggable: "false" }));
+    if (P.id === "molino" && oroMolino() >= MOLINO_HORA) el.append(h("div", { class: "burbuja-oro", title: "Samle inn" }, ic("two-coins", "", "#e0b04f"), " +" + oroMolino()));
+    el.addEventListener("click", e => { if (modoBygg || (vistaMapa && vistaMapa.arrastrado)) return; e.stopPropagation(); SFX.madera(); abrirEdificio(P, el); });
+  } else if (T.muro) {
+    el = h("div", { class: "muro-mapa" + (J.fuego === "empalizada" ? " quemado" : ""), style: `--madera:${["#9a6a35", "#5b6f9f", "#8a5a9a"][(J.colores || {}).empalizada || 0]}` }, h("i"));
+  } else if (T.plano) {
+    el = h("img", { class: "objeto-mapa plano", src: arte(o.t), alt: "", draggable: "false", style: `width:${T.w * CELDA}px` });
+  } else {
+    el = h("img", { class: "objeto-mapa", src: arte(o.t), alt: "", draggable: "false", style: `width:${T.px}px` });
+  }
+  el.classList.add("obj");
+  if (seleccion === o.u) el.classList.add("seleccionado");
+  situar(el, o.t, o.c, o.r);
+  if (modoBygg) el.addEventListener("pointerdown", e => { if (e.button !== 0) return; e.stopPropagation(); e.preventDefault(); arrastrarObjeto(o, el, e); });
+  return el;
+}
+/* Modo Bygg: arrastrar cualquier cosa a otra casilla (verde = cabe, rojo = no). */
+function arrastrarObjeto(o, el, e0) {
+  const T = tipo(o.t), v = vistaMapa, mundo = el.parentNode;
+  const huella = h("div", { class: "huella", style: `width:${T.w * CELDA}px;height:${T.h * CELDA}px` });
+  mundo.append(huella);
+  const aMundo = (cx, cy) => [(cx - v.x) / v.s, (cy - v.y) / v.s];
+  const [wx0, wy0] = aMundo(e0.clientX, e0.clientY);
+  const offC = (wx0 - REJ.x) / CELDA - o.c, offR = (wy0 - REJ.y) / CELDA - o.r;
+  let c = o.c, r = o.r, ok = true, movido = false;
+  const pintar = () => { huella.style.left = REJ.x + c * CELDA + "px"; huella.style.top = REJ.y + r * CELDA + "px"; ok = cabe(o.t, c, r, o); huella.classList.toggle("mal", !ok); situar(el, o.t, c, r); el.style.zIndex = 5000; };
+  pintar();
+  el.classList.add("arrastrado");
+  const mover = e => {
+    if (!movido && Math.hypot(e.clientX - e0.clientX, e.clientY - e0.clientY) < 5) return;
+    movido = true;
+    const [wx, wy] = aMundo(e.clientX, e.clientY);
+    const c2 = Math.round((wx - REJ.x) / CELDA - offC), r2 = Math.round((wy - REJ.y) / CELDA - offR);
+    if (c2 !== c || r2 !== r) { c = c2; r = r2; pintar(); }
+  };
+  const soltar = () => {
+    removeEventListener("pointermove", mover); removeEventListener("pointerup", soltar);
+    if (!movido) { seleccion = seleccion === o.u ? null : o.u; pyntValgt = null; return pintarCampamento(); }
+    if (ok) { o.c = c; o.r = r; guardar(); SFX.madera(); } else { SFX.mal(); aviso2("Det er ikke plass der."); }
+    seleccion = o.u; pintarCampamento();
+  };
+  addEventListener("pointermove", mover); addEventListener("pointerup", soltar);
+}
+/* Con algo elegido en la tienda: una sombra sigue al ratón; clic para ponerlo. */
+function prepararColocar(mundo) {
+  const t = pyntValgt, T = tipo(t), v = () => vistaMapa;
+  const huella = h("div", { class: "huella fantasma", style: `width:${T.w * CELDA}px;height:${T.h * CELDA}px` }, h("img", { src: T.muro ? "" : arte(t), alt: "", draggable: "false", style: T.muro ? "display:none" : "" }));
+  mundo.append(huella);
+  let c = -1, r = -1;
+  const celda = e => { const s = v(); const wx = (e.clientX - s.x) / s.s, wy = (e.clientY - s.y) / s.s; return [Math.round((wx - REJ.x) / CELDA - T.w / 2), Math.round((wy - REJ.y) / CELDA - T.h / 2)]; };
+  mundo.addEventListener("pointermove", e => {
+    [c, r] = celda(e);
+    huella.style.left = REJ.x + c * CELDA + "px"; huella.style.top = REJ.y + r * CELDA + "px";
+    huella.classList.toggle("mal", !cabe(t, c, r));
+  });
+  mundo.addEventListener("click", e => {
+    if (vistaMapa && vistaMapa.arrastrado) return;
+    [c, r] = celda(e);
+    colocar(t, c, r);
+  });
+}
+function colocar(t, c, r) {
+  const T = tipo(t), P = pynt();
+  if (!cabe(t, c, r)) { SFX.mal(); aviso2("Det er ikke plass der."); return; }
+  if (T.muro) { if (murosPuestos() >= limiteMuro()) { aviso2(`Ingen flere palisader. Oppgrader Palisaden for ${8} til.`); return; } }
+  else if (P.lager[t] > 0) P.lager[t]--;
+  else if (J.oro >= T.p) J.oro -= T.p;
+  else { aviso2(`Du trenger ${T.p - J.oro} gull til. Dra på tokt!`); return; }
+  const M = mapa(); M.objs.push({ u: M.sig++, t, c, r }); guardar(); SFX.moneda(); SFX.madera();
+  pintarCampamento();
+}
+function aLager(u) {
+  const M = mapa(), i = M.objs.findIndex(o => o.u === u); if (i < 0) return;
+  const o = M.objs[i], T = tipo(o.t); if (T.edif) return;
+  M.objs.splice(i, 1);
+  if (!T.muro) { const P = pynt(); P.lager[o.t] = (P.lager[o.t] || 0) + 1; }
+  seleccion = null; guardar(); SFX.madera(); pintarCampamento();
+}
+function catalogoBygg() {
+  const P = pynt(), sel = seleccion && mapa().objs.find(o => o.u === seleccion), T = sel && tipo(sel.t);
+  const barra = sel
+    ? h("div", { class: "fila entre seleccion-bygg" }, h("b", null, "Valgt: ", T.edif ? PARCELAS.find(p => p.id === T.edif).n : T.n || sel.t),
+        T.edif ? h("span", { class: "faint" }, "Dra den dit du vil. Bygninger kan ikke fjernes.")
+          : h("button", { class: "btn chico", onclick: () => aLager(sel.u) }, T.muro ? "Fjern" : "↩ Til lageret"))
+    : h("div", { class: "faint" }, pyntValgt ? "Klikk der du vil sette den. Rødt = ikke plass." : "Dra alt i leiren dit du vil. Eller velg noe nedenfor og klikk på kartet.");
+  return h("div", { class: "catalogo" },
+    h("div", { class: "fila entre" }, h("b", null, "🛠️ Bygg leiren din"), h("button", { class: "btn chico oro", onclick: () => { modoBygg = false; pyntValgt = null; seleccion = null; pintarCampamento(); } }, "Ferdig ✓ ⏎")),
+    barra,
+    h("div", { class: "catalogo-lista" }, TIENDA.map(t => {
+      const D = tipo(t), quedan = limiteMuro() - murosPuestos();
+      return h("button", { class: "pieza" + (pyntValgt === t ? " elegida" : ""), onclick: () => { pyntValgt = pyntValgt === t ? null : t; seleccion = null; pintarCampamento(); } },
+        D.muro ? h("span", { class: "pieza-muro" }, ic("palisade", "", "#c9a26b")) : h("img", { src: arte(t), alt: "", draggable: "false" }),
+        h("span", null, D.n),
+        D.muro ? h("small", null, `${quedan} igjen`) : P.lager[t] ? h("small", null, `${P.lager[t]} på lager`) : h("small", null, ic("two-coins", "", "#e0b04f"), " " + D.p));
+    })));
 }
 /* Arrastrar para moverse y rueda (o pellizco) para el zoom. */
 function montarVista(vp, mundo) {
   const W = MUNDO.w, H = MUNDO.h;
   const minS = () => Math.max(vp.clientWidth / W, vp.clientHeight / H);
-  let v = vistaMapa || (() => { const s = Math.max(minS(), Math.min(vp.clientWidth / 1300, vp.clientHeight / 1000, 1.2)); return { s, x: vp.clientWidth / 2 - 800 * s, y: vp.clientHeight / 2 - 570 * s }; })();
+  let v = vistaMapa || (() => {
+    const s = Math.max(minS(), Math.min(vp.clientWidth / 1300, vp.clientHeight / 950, 1.2)), sal = mapa().objs.find(o => o.t === "salon") || { c: 17, r: 7 };
+    return { s, x: vp.clientWidth / 2 - (REJ.x + (sal.c + 2.5) * CELDA) * s, y: vp.clientHeight / 2 - (REJ.y + (sal.r + 4) * CELDA) * s };
+  })();
   vistaMapa = v;
   function aplicar() {
     v.s = Math.min(1.8, Math.max(minS(), v.s));
@@ -404,60 +540,22 @@ function montarVista(vp, mundo) {
   aplicar();
 }
 function pasear(caminantes) {
-  const puntos = [[620, 600], [700, 700], [900, 650], [980, 560], [820, 700], [560, 520], [760, 640], [880, 760], [520, 700], [1000, 700]];
+  const libres = () => { const s = ocupadas(); const out = []; for (let c = 2; c < REJ.cols - 2; c++) for (let r = 2; r < REJ.filas - 1; r++) if (!s.has(c + "," + r)) out.push([REJ.x + (c + .5) * CELDA, REJ.y + (r + 1) * CELDA]); return out; };
+  const puntos = libres();
+  if (!puntos.length) return;
   for (const el of caminantes) {
+    const [x0, y0] = puntos[Math.floor(Math.random() * puntos.length)];
+    el.style.transition = "none"; el.style.left = x0 + "px"; el.style.top = y0 + "px"; el.style.zIndex = Math.round(y0);
     const mover = () => {
       if (!el.isConnected) return;
-      const [x, y] = puntos[Math.floor(Math.random() * puntos.length)], x0 = parseFloat(el.style.left);
-      el.style.transform = `translate(-50%,-100%) scaleX(${x < x0 ? -1 : 1})`;
+      el.style.transition = "";
+      const [x, y] = puntos[Math.floor(Math.random() * puntos.length)], xa = parseFloat(el.style.left);
+      el.style.transform = `translate(-50%,-100%) scaleX(${x < xa ? -1 : 1})`;
       el.style.left = x + "px"; el.style.top = y + "px"; el.style.zIndex = Math.round(y);
       setTimeout(mover, 5200 + Math.random() * 2500);
     };
     setTimeout(mover, 300 + Math.random() * 2000);
   }
-}
-/* ---------- zona de adornos ---------- */
-function centrarZona() {   // que la zona quede a la vista encima del catálogo
-  const v = vistaMapa, cx = ZONA.x + ZONA.cols * ZONA.c / 2, cy = ZONA.y + ZONA.filas * ZONA.c / 2;
-  v.x = innerWidth / 2 - cx * v.s; v.y = (innerHeight - 240) / 2 - cy * v.s;
-}
-function pintarZona(mundo) {
-  const Z = ZONA, P = pynt();
-  const zona = h("div", { class: "zona-pynt", style: `left:${Z.x}px;top:${Z.y}px;width:${Z.cols * Z.c}px;height:${Z.filas * Z.c}px;grid-template-columns:repeat(${Z.cols},${Z.c}px)` });
-  for (let r = 0; r < Z.filas; r++) for (let c = 0; c < Z.cols; c++) {
-    const ocupado = P.plassert.find(x => x.col === c && x.row === r);
-    const celda = h("div", { class: "celda-pynt" + (ocupado ? " llena" : ""), title: modoBygg ? (ocupado ? "Klikk for å flytte til lageret" : "Klikk for å sette pynt her") : "" });
-    if (modoBygg) celda.addEventListener("click", e => { if (vistaMapa && vistaMapa.arrastrado) return; e.stopPropagation(); clicCelda(c, r); });
-    zona.append(celda);
-  }
-  mundo.append(zona);
-  for (const x of P.plassert) {
-    const d = PYNT.find(d => d.id === x.id); if (!d) continue;
-    const cx = Z.x + Z.c * (x.col + .5), cy = d.tile ? Z.y + Z.c * (x.row + .5) : Z.y + Z.c * (x.row + 1) - 4;
-    mundo.append(h("img", { class: "objeto-mapa pynt" + (d.tile ? " plano" : ""), src: arte(d.id), alt: "", draggable: "false",
-      style: `left:${cx}px;top:${cy}px;width:${d.tile ? Z.c : d.t}px;z-index:${d.tile ? 1 : Math.round(cy)}` + (d.tile ? ";transform:translate(-50%,-50%)" : "") }));
-  }
-}
-function clicCelda(c, r) {
-  const P = pynt(), i = P.plassert.findIndex(x => x.col === c && x.row === r);
-  if (i >= 0) { const x = P.plassert.splice(i, 1)[0]; P.lager[x.id] = (P.lager[x.id] || 0) + 1; guardar(); SFX.madera(); return pintarCampamento(); }
-  if (!pyntValgt) { aviso2("Velg pynt nederst først."); return; }
-  const d = PYNT.find(d => d.id === pyntValgt);
-  if (P.lager[d.id] > 0) P.lager[d.id]--;
-  else if (J.oro >= d.p) J.oro -= d.p;
-  else { aviso2(`Du trenger ${d.p - J.oro} gull til. Dra på tokt!`); return; }
-  P.plassert.push({ id: d.id, col: c, row: r }); guardar(); SFX.moneda(); SFX.madera();
-  pintarCampamento();
-}
-function aviso2(txt) { const a = h("div", { class: "aviso-mapa" }, txt); document.body.append(a); setTimeout(() => a.remove(), 2200); }
-function catalogoPynt() {
-  const P = pynt();
-  return h("div", { class: "catalogo" },
-    h("div", { class: "fila entre" }, h("b", null, "🛠️ Pynt leiren: velg, og klikk en rute. Klikk på pynt for å fjerne den."),
-      h("button", { class: "btn chico oro", onclick: () => { modoBygg = false; pyntValgt = null; pintarCampamento(); } }, "Ferdig ✓")),
-    h("div", { class: "catalogo-lista" }, PYNT.map(d => h("button", { class: "pieza" + (pyntValgt === d.id ? " elegida" : ""), onclick: () => { pyntValgt = pyntValgt === d.id ? null : d.id; pintarCampamento(); } },
-      h("img", { src: arte(d.id), alt: "", draggable: "false" }), h("span", null, d.n),
-      P.lager[d.id] ? h("small", null, `${P.lager[d.id]} på lager`) : h("small", null, ic("two-coins", "", "#e0b04f"), " " + d.p)))));
 }
 /* ---------- colores ---------- */
 function selectorTono(img, id, despues) {

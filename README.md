@@ -18,7 +18,9 @@ Dobbeltklikk **Actualizar.bat**. Fremgangen din blir liggende.
 - Fjern alt med **Desinstalar.bat**.
 
 ## Pynt og farger
-- **🛠️ Pynt**: kjøp pynt med gull (trær, steiner, åkre, brønn, telt, statue …) og sett den i rutene ved stranden. Klikk på pynt for å legge den på lageret.
+- **🛠️ Bygg**: hele leiren er et rutenett. Dra bygninger, palisade og pynt dit du vil (grønt = plass, rødt = ikke plass).
+  Kjøp pynt med gull (trær, steiner, åkre, brønn, hus, telt, statue …) og klikk på kartet for å sette den. Klikk på pynt for å legge den på lageret.
+  Palisaden: høyere nivå = flere biter.
 - **🎨 Farger**: velg kart (sommer, høst, vinter) og fargen på hver bygning.
 
 ## Venner
