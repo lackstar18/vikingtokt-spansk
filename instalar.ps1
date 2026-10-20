@@ -1,4 +1,6 @@
-﻿# Instalador de Vikingtokt (lo ejecuta Instalar.bat). Solo para el usuario actual, sin administrador.
+﻿# Instalador de Vikingtokt (lo ejecuta Instalar.bat o Vikingtokt-Installer.exe). Solo para el usuario actual, sin administrador.
+# -Python: el python.exe que ya ha encontrado o instalado el .exe. -Prueba: solo comprueba, no registra nada (para probar en el PC de Elena).
+param([string]$Python = '', [switch]$Prueba)
 $ErrorActionPreference = 'Stop'
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
@@ -9,18 +11,19 @@ function ProbarPy($cmd, $extra) {
   } catch {}
   return $null
 }
-$exe = ProbarPy 'py' @('-3')
+$exe = if ($Python -and (Test-Path $Python)) { $Python } else { $null }
+if (-not $exe) { $exe = ProbarPy 'py' @('-3') }
 if (-not $exe) { $exe = ProbarPy 'python' @() }
 if (-not $exe) {
   Write-Host ''
   Write-Host 'Python mangler på denne PC-en.' -ForegroundColor Red
-  Write-Host '1. Åpne Microsoft Store og søk etter "Python 3.13".'
-  Write-Host '2. Trykk "Get" (Hent).'
-  Write-Host '3. Kjør Instalar.bat igjen.'
+  Write-Host 'Last ned og kjør Vikingtokt-Installer.exe i stedet (den installerer Python selv):'
+  Write-Host 'https://github.com/lackstar18/vikingtokt-spansk/releases/latest/download/Vikingtokt-Installer.exe'
   exit 1
 }
 $pyw = Join-Path (Split-Path $exe) 'pythonw.exe'
 if (-not (Test-Path $pyw)) { $pyw = $exe }
+if ($Prueba) { Write-Host "PRUEBA ok: python=$exe pythonw=$pyw dir=$dir"; exit 0 }
 
 # 1) Krigshornet kl. 20:00, mandag til fredag
 $dias = 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'

@@ -10,3 +10,6 @@ aviso_estado.json
 cuerno.wav
 __pycache__/
 *.tmp
+
+# El instalador compilado va a GitHub Releases, no al repo
+instalador/*.exe
