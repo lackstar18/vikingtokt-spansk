@@ -2,6 +2,13 @@
 
 Et spill for å lære spansk (nivå A1) for nordmenn. Du er en viking som går i land i Spania.
 
+## Spill på iPhone (eller mobil)
+1. Åpne **https://lackstar18.github.io/vikingtokt-spansk/** i Safari.
+2. Trykk **Share** (firkanten med pil opp) → **Add to Home Screen**.
+3. Nå har du Vikingtokt med ikon på hjemskjermen.
+
+På iPhone lagres fremgangen i telefonen (ikke den samme som på PC-en). Krigshornet kl. 20:00, duellen og DeepSeek-bonusen finnes bare på PC.
+
 ## Installer (Windows)
 1. Trykk **Code → Download ZIP** og pakk ut mappen (for eksempel til `C:\Vikingtokt`).
 2. Dobbeltklikk **Instalar.bat**.

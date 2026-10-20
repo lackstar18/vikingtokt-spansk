@@ -318,3 +318,10 @@ input[type=range] { width: 220px; accent-color: var(--oro); }
 .pieza:disabled { opacity: .5; cursor: not-allowed; }
 /* ---------- vennetokt ---------- */
 .vt-reloj { max-width: 720px; margin: 10px auto 0; }
+
+/* móvil (iPhone, versión web): los botones redondos no se meten debajo de TOKT */
+@media (max-width: 480px) {
+  .btn.redondo { width: 56px; height: 56px; font-size: 1.25em; }
+  .hud-abajo-izq { gap: 6px; max-width: calc(100vw - 132px); flex-wrap: wrap; }
+  .btn-tokt { width: 104px !important; height: 104px !important; }
+}

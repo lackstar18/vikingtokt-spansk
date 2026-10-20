@@ -31,4 +31,8 @@ if ($FraSpillet) {
   $lnk = Join-Path ([Environment]::GetFolderPath('Startup')) 'Vikingtokt duell.lnk'
   if (Test-Path $lnk) { Start-Process $lnk }
 }
+# Ikonet på skrivebordet (fantes ikke før 20. okt)
+$ico = Join-Path $dir 'arteikingtokt.ico'
+$snarvei = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Vikingtokt.lnk'
+if ((Test-Path $ico) -and (Test-Path $snarvei)) { $ws = New-Object -ComObject WScript.Shell; $l = $ws.CreateShortcut($snarvei); $l.IconLocation = $ico; $l.Save() }
 Write-Host 'Ferdig! Spillet er oppdatert. Fremgangen din er den samme.' -ForegroundColor Green
