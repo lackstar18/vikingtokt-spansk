@@ -305,3 +305,9 @@ input[type=range] { width: 220px; accent-color: var(--oro); }
 @media (prefers-reduced-motion: reduce) {
   .estado.peligro, .flota, .temblor, .cofre .caja.sacude, .premio { animation: none; }
 }
+
+/* ---------- rekke (días seguidos) y aviso de versión nueva ---------- */
+.pastilla.racha { color: #ffb15c; }
+.racha-txt { color: #ffb15c; font-weight: 700; }
+.btn.icono { position: relative; }
+.btn.icono .punto { position: absolute; top: -3px; right: -3px; width: 12px; height: 12px; border-radius: 50%; background: #e0463c; border: 2px solid #fff7e0; }

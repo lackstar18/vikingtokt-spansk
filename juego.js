@@ -109,6 +109,14 @@ function rango(lp) {
   return { ...RANGOS[i], i, sig, pct: sig ? (lp - RANGOS[i].lp) / (sig.lp - RANGOS[i].lp) : 1 };
 }
 function lunesDe(f) { return masDias(f, -diaSem(f)); }
+/* Rekke (Elena, 20 oct: «strikes de conexión a los 5 días, tiene recompensa»): días de clase seguidos con tokt.
+   El finde ni cuenta ni rompe. Cada 5 días, una kiste episk o mejor; cada 20, legendarisk. */
+function rachaHasta(f) {
+  let n = 0;
+  for (let d = f; d >= J.creado; d = masDias(d, -1)) { if (esFinde(d)) continue; if (J.dias[d] > 0) n++; else break; }
+  return n;
+}
+const racha = () => { const t = hoy(); return rachaHasta(J.dias[t] > 0 || esFinde(t) ? t : masDias(t, -1)); };
 
 /* Días de clase (lun-vie) sin asalto: viene un español y destruye algo. */
 function revisarAusencias() {
@@ -220,7 +228,7 @@ document.addEventListener("keydown", e => {
 /* ================= capas: avisos y modales ================= */
 function modal(contenido, clase) {
   const capa = $("#capa"), f = h("div", { class: "fondo" }, h("div", { class: "modal " + (clase || "") }, contenido));
-  if (!(clase || "").includes("rojo")) f.addEventListener("pointerdown", e => { if (e.target === f) f.remove(); });   // clic fuera = cerrar (los avisos rojos, no)
+  if (!/rojo|fija/.test(clase || "")) f.addEventListener("pointerdown", e => { if (e.target === f) f.remove(); });   // clic fuera = cerrar (los avisos rojos, no)
   capa.append(f);
   return () => f.remove();
 }
@@ -412,7 +420,8 @@ function pintarCampamento() {
     modoBygg ? null : h("div", { class: "hud-centro" }, estado),
     h("div", { class: "hud-der" }, h("div", { class: "pastilla", title: "Gull" }, ic("two-coins", "", "#e0b04f"), " " + J.oro),
       h("div", { class: "pastilla", title: "Denne uka (man–fre)" }, "📅 " + hechasSemana + "/5"),
-      h("button", { class: "btn icono", title: "Innstillinger", onclick: ajustes }, "⚙️")),
+      h("div", { class: "pastilla racha", title: `${racha()} ukedager på rad. Kiste hver 5. dag. Helgen bryter ikke rekka.` }, "🔥 " + racha()),
+      h("button", { class: "btn icono", title: "Innstillinger", onclick: ajustes }, "⚙️", nyVersjon() ? h("i", { class: "punto", title: "Ny versjon" }) : null)),
     h("div", { class: "hud-abajo-izq" }, h("button", { class: "btn redondo", onclick: abrirVenner, title: "Venner og liga" }, "👥", h("small", null, "Venner")),
       h("button", { class: "btn redondo", onclick: inventario, title: "Smia: byttet ditt" }, "🎒", h("small", null, "Bytte")),
       h("button", { class: "btn redondo" + (modoBygg ? " activo" : ""), onclick: () => { modoBygg = !modoBygg; pyntValgt = null; seleccion = null; pintarCampamento(); }, title: "Bygg: flytt alt i leiren" }, "🛠️", h("small", null, "Bygg"),
@@ -789,6 +798,13 @@ function inventario() {
 }
 function ajustes() {
   const vol = h("span", { class: "dim" }, J.ajustes.volumen + " %");
+  const versjon = h("div", { class: "fila centro", style: "margin-top:10px" });
+  const pintarVersjon = () => {
+    versjon.replaceChildren(...plano(!SERVIDOR ? h("span", { class: "faint" }, "Start spillet med Jugar.bat for å kunne oppdatere.")
+      : nyVersjon() ? h("button", { class: "btn oro", onclick: () => { cerrar(); oppdater(); } }, `⬇️ Oppdater til versjon ${OPPD.remoto}`)
+        : [h("span", { class: "faint" }, OPPD ? `Versjon ${OPPD.local}` : ""), h("button", { class: "btn chico", onclick: async e => { e.target.textContent = "…"; await sjekkOppdatering(true); pintarVersjon(); } }, "Se etter oppdatering")]));
+  };
+  pintarVersjon();
   let prueba = null;
   const cerrar = modal([h("h2", null, "⚙️ Innstillinger"),
     h("label", { class: "fila centro", style: "margin-top:14px" }, "🔉 Volum",
@@ -797,9 +813,45 @@ function ajustes() {
         clearTimeout(prueba); prueba = setTimeout(() => { SFX.moneda(); decir("¡Hola, vikingo!", "h"); }, 300);
       } }), vol),
     h("label", { class: "fila centro" }, h("input", { type: "checkbox", checked: J.ajustes.auto, onchange: e => { J.ajustes.auto = e.target.checked; guardar(); } }), "Spill spansk lyd automatisk"),
+    versjon,
     h("div", { class: "fila centro", style: "margin-top:16px" },
       h("button", { class: "btn", onclick: () => cerrar() }, "Lukk"),
       h("button", { class: "btn chico rojo", onclick: () => { if (confirm("Slette leiren din og begynne på nytt?") && confirm("Sikker? Dette kan ikke angres.")) { localStorage.removeItem(CLAVE); location.reload(); } } }, "Nullstill"))]);
+}
+/* Oppdatering inne i spillet (Elena, 20 oct): el servidor mira version.json en GitHub y lanza actualizar.ps1. */
+let OPPD = null;     // { local, remoto }
+async function sjekkOppdatering(fresca) {
+  if (!SERVIDOR) return null;
+  try { OPPD = await (await fetch("api/version" + (fresca ? "?fresca=1" : ""), { cache: "no-store" })).json(); } catch (e) { OPPD = null; }
+  return OPPD;
+}
+const nyVersjon = () => !!(OPPD && OPPD.remoto > OPPD.local);
+function tilbyOppdatering() {
+  const cerrar = modal([h("div", { style: "font-size:3em" }, "⬇️"), h("h2", null, "Ny versjon av spillet!"),
+    h("p", { class: "dim" }, "Fremgangen din, gullet og leiren blir de samme."),
+    h("div", { class: "fila centro", style: "margin-top:14px" },
+      h("button", { class: "btn oro grande", onclick: () => { cerrar(); oppdater(); } }, "Oppdater nå ⏎"),
+      h("button", { class: "btn", onclick: () => cerrar() }, "Senere"))]);
+  TECLAS.enter = () => { cerrar(); oppdater(); };
+}
+async function oppdater() {
+  const meta = OPPD && OPPD.remoto;
+  const cerrar = modal([ic("hourglass", "xg"), h("h2", null, "Oppdaterer…"), h("p", { class: "dim" }, "Ikke lukk vinduet. Det tar under ett minutt.")], "fija");
+  let ok = false;
+  try { ok = (await (await fetch("api/oppdater", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).json()).ok; } catch (e) { }
+  for (let i = 0; ok && i < 60; i++) {
+    await espera(3000);
+    try {
+      const v = await (await fetch("api/version", { cache: "no-store" })).json();
+      if (v.local >= meta) {     // ya está: recarga sin caché
+        for (const u of ["index.html", "juego.js", "estilo.css", "arte/iconos.js", ...Object.keys(ES.misiones).map(n => `misiones/mision${String(n).padStart(2, "0")}.js`)])
+          await fetch(u, { cache: "reload" }).catch(() => { });
+        location.reload(); return;
+      }
+    } catch (e) { }     // el servidor se está reiniciando
+  }
+  cerrar();
+  aviso("Kunne ikke oppdatere nå. Sjekk internett og prøv igjen senere.", "hourglass");
 }
 function creditos() {
   const autores = {};
@@ -1140,9 +1192,11 @@ async function resultado(m, st) {
   J.dias[t] = (J.dias[t] || 0) + 1; J.misiones[m.id] = (J.misiones[m.id] || 0) + 1;
   J.oro += oro; J.lp += lp; if (primera) J.fuego = null; guardar();
   const rDespues = rango(J.lp), sube = rDespues.i > rAntes.i;
-  // semana perfecta: 5 de 5 de lunes a viernes
+  // semana perfecta: 5 de 5 de lunes a viernes (cuenta para la liga)
   const lun = lunesDe(t), perfecta = !esFinde(t) && [0, 1, 2, 3, 4].every(i => J.dias[masDias(lun, i)] > 0) && !J.semanasPerfectas[lun];
   if (perfecta) { J.semanasPerfectas[lun] = true; guardar(); }
+  // rekke: con el primer tokt del día se ve si toca kiste (cada 5 días seguidos)
+  const rk = racha(), premioRacha = primera && !esFinde(t) && rk > 0 && rk % 5 === 0;
   await esperarSalida(new Promise(res => {
     if (sube) SFX.victoria();
     pantalla(h("div", { class: "escena runa" }, ic("laurels-trophy", "xg", rDespues.c), h("h1", null, "Toktet er ferdig"),
@@ -1150,12 +1204,13 @@ async function resultado(m, st) {
       h("p", { class: "botin-cuenta" }, `+${oro} gull · +${lp} LP`),
       sube ? h("h2", { style: `color:${rDespues.c}` }, `⬆ NY RANG: ${rDespues.n}!`) : h("p", { class: "dim" }, `${rDespues.n} · ${J.lp} LP`),
       primera && !esFinde(t) ? h("p", { style: "color:var(--verde);font-weight:700" }, "🛡️ Leiren din er trygg i dag.") : null,
+      primera && !esFinde(t) ? h("p", { class: "racha-txt" }, `🔥 ${rk} på rad`, premioRacha ? " · REKKEKISTE!" : ` · ${5 - rk % 5} til neste kiste`) : null,
       lpAntes === J.lp && !primera ? h("p", { class: "faint" }, "Ekstra tokt i dag gir fortsatt gull og kister.") : null,
       h("button", { class: "btn oro grande", onclick: res }, "ÅPNE KISTEN ⏎")));
     TECLAS.enter = res;
   }));
-  await abrirCofre(false);
-  if (perfecta) await abrirCofre(true);
+  await abrirCofre(null);
+  if (premioRacha) await abrirCofre({ min: rk % 20 === 0 ? "legendary" : "epic", dias: rk });
 }
 function tirar(minimo) {
   const orden = ["common", "rare", "epic", "legendary"];
@@ -1165,9 +1220,10 @@ function tirar(minimo) {
   const pool = BOTIN.filter(b => b.r === r);
   return pool[Math.floor(Math.random() * pool.length)];
 }
-function abrirCofre(perfecto) {
+function abrirCofre(especial) {     // especial = { min, dias }: kiste de la rekke
+  const perfecto = !!especial;
   return esperarSalida(new Promise(res => {
-    const premio = tirar(perfecto ? "epic" : null);
+    const premio = tirar(perfecto ? especial.min : null);
     const caja = h("div", { class: "caja" }, ic("chest", "xxg"));
     const zona = h("div");
     let golpes = 0;
@@ -1199,10 +1255,11 @@ function abrirCofre(perfecto) {
       TECLAS.enter = res;
     }
     pantalla(h("div", { class: "escena cofre" },
-      h("h1", null, perfecto ? "KISTE FOR PERFEKT UKE" : "Tokt-kiste"), perfecto ? h("p", { style: "color:var(--epico);font-weight:700" }, "5/5 denne uka: episk eller bedre garantert!") : null,
+      h("h1", null, perfecto ? "REKKEKISTE" : "Tokt-kiste"),
+      perfecto ? h("p", { style: `color:${RAREZAS[especial.min].c};font-weight:700` }, `🔥 ${especial.dias} ukedager på rad: ${especial.min === "legendary" ? "legendarisk garantert" : "episk eller bedre garantert"}!`) : null,
       caja, info, zona,
       h("div", { class: "probabilidades" }, "Sjanser: ", Object.entries(RAREZAS).map(([k, v], i) => [i ? " · " : "", h("b", { style: `color:${v.c}` }, NOMBRE_RAREZA[k]), ` ${v.p} %`]),
-        perfecto ? " (denne kisten: episk eller bedre)" : "", h("br"), "Aldri ekte penger. Kister får du bare fra tokt.")));
+        perfecto ? (especial.min === "legendary" ? " (denne kisten: legendarisk)" : " (denne kisten: episk eller bedre)") : "", h("br"), "Aldri ekte penger. Kister får du bare fra tokt.")));
     TECLAS.enter = () => caja.click(); TECLAS.espacio = () => caja.click();
   }));
 }
@@ -1215,6 +1272,7 @@ function cuerno() {
   if (Date.now() < J.cuerno.prox) return;
   SFX.cuerno(); decir("¡Vikingo! ¡A la batalla!", "h");
   const cerrar = modal([ic("hunting-horn", "xg"), h("h1", null, "Krigshornet lyder!"), h("p", null, "Klokka er 20:00. Tid for tokt, viking. Hopper du over, brenner Capitán Rodrigo leiren din ved midnatt."),
+    racha() > 0 ? h("p", { class: "racha-txt" }, `🔥 Ikke mist rekka di: ${racha()} på rad!`) : null,
     h("div", { class: "fila centro", style: "margin-top:14px" },
       h("button", { class: "btn oro grande", onclick: () => { cerrar(); asaltar(ES.misiones[1]); } }, "⚔️ TOKT NÅ"),
       J.cuerno.n < 2 ? h("button", { class: "btn", onclick: () => { J.cuerno.n++; J.cuerno.prox = Date.now() + 10 * 60e3; guardar(); cerrar(); } }, `+10 min (jeg er i et spill) · ${2 - J.cuerno.n} igjen`) : null)], "rojo");
@@ -1248,12 +1306,14 @@ async function arrancar() {
     const cerrar = modal([ic("burning-embers", "xg"), h("h1", null, "Mens du var borte…"),
       ev.map(e => h("div", { class: "evento" }, h("b", null, new Date(e.d + "T12:00").toLocaleDateString("nb-NO", { weekday: "long", day: "numeric", month: "short" })), ": Capitán Rodrigo ", e.txt, e.lp ? ` (−${e.lp} LP)` : "")),
       h("div", { class: "bocadillo" }, ES.misiones[1].burla, h("span", { class: "en" }, ES.misiones[1].burla_no)),
+      rachaHasta(masDias(ev[0].d, -1)) > 0 ? h("p", { class: "racha-txt" }, `🔥 Rekka di på ${rachaHasta(masDias(ev[0].d, -1))} dager er brutt.`) : null,
       h("p", { class: "dim" }, "Dra på tokt i dag og oppgrader palisaden for å stoppe ham."),
       h("button", { class: "btn rojo grande", onclick: () => { cerrar(); pintarCampamento(); } }, "HEVN ⏎")], "rojo");
     TECLAS.enter = () => { cerrar(); pintarCampamento(); };
   }
   if (/[?&]tokt=1/.test(location.search) && !ev.length) { history.replaceState(null, "", location.pathname); asaltar(ES.misiones[1]); return; }   // viene del aviso de las 20:00
   setTimeout(cuerno, 1500);
+  if (await sjekkOppdatering() && nyVersjon() && !enAsalto && !$(".fondo")) { pintarCampamento(); tilbyOppdatering(); }
 }
 arrancar();
 

@@ -3,6 +3,8 @@
 - Sirve la carpeta en http://127.0.0.1:8766 y abre el navegador (con --tokt empieza un asalto nada más abrir).
 - GET/POST api/progreso -> progreso.json (copia diaria en copias/, guarda 14). Lo leen el aviso de las 20:00 y el duelo.
 - POST api/ia            -> DeepSeek corrige una frase libre. La clave va en clave_deepseek.txt (nunca en el juego).
+- GET api/version / POST api/oppdater -> actualizar desde dentro del juego (version.json local contra GitHub;
+  lanza actualizar.ps1, que copia lo nuevo sin tocar el progreso y vuelve a abrir este servidor).
 - Arranca también el duelo (duelo.py) si no está ya en marcha.
 - Se cierra solo 4 horas después de cerrar la pestaña (el juego hace ping cada 30 s).
 """
@@ -24,6 +26,8 @@ PROGRESO = os.path.join(CARPETA, "progreso.json")
 COPIAS = os.path.join(CARPETA, "copias")
 CLAVE_IA = os.path.join(CARPETA, "clave_deepseek.txt")
 USO_IA = os.path.join(CARPETA, "uso_ia.json")
+VERSION = os.path.join(CARPETA, "version.json")
+REPO = "lackstar18/vikingtokt-spansk"
 PUERTO = 8766
 ESPERA_CIERRE = 4 * 3600
 IA_BASE = os.environ.get("ESPANOL_IA_BASE", "https://api.deepseek.com").rstrip("/")
@@ -114,6 +118,47 @@ def corregir(texto, contexto=""):
         return {"error": "red", "detalle": str(e)[:200]}
 
 
+def pythonw():
+    py = sys.executable.replace("python.exe", "pythonw.exe")
+    return py if os.path.exists(py) else sys.executable
+
+
+def version_local():
+    try:
+        with open(VERSION, encoding="utf-8") as f:
+            return int(json.load(f).get("v", 0))
+    except (OSError, ValueError, TypeError, AttributeError):
+        return 0
+
+
+_remota = {"t": 0, "v": 0}
+
+
+def version_remota(fresca=False):
+    """Versión que hay en GitHub (0 si no hay internet). Se mira como mucho cada 10 minutos."""
+    if not fresca and time.time() - _remota["t"] < 600:
+        return _remota["v"]
+    try:
+        url = f"https://raw.githubusercontent.com/{REPO}/main/version.json?t={int(time.time())}"
+        with urllib.request.urlopen(url, timeout=8) as r:
+            v = int(json.loads(r.read().decode("utf-8")).get("v", 0))
+        _remota.update(t=time.time(), v=v)
+        return v
+    except (urllib.error.URLError, socket.timeout, OSError, ValueError, TypeError, AttributeError):
+        return 0
+
+
+def oppdatere():
+    """Lanza actualizar.ps1 escondido; al acabar, él mismo vuelve a abrir el servidor."""
+    try:
+        subprocess.Popen(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden",
+                          "-File", os.path.join(CARPETA, "actualizar.ps1"), "-FraSpillet", "-Python", pythonw()],
+                         cwd=CARPETA, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        return True
+    except OSError:
+        return False
+
+
 def lanzar_duelo():
     """El duelo (duelo.py) en segundo plano, si no está ya en marcha."""
     try:
@@ -121,11 +166,8 @@ def lanzar_duelo():
         return
     except (urllib.error.URLError, socket.timeout, OSError):
         pass
-    py = sys.executable.replace("python.exe", "pythonw.exe")
-    if not os.path.exists(py):
-        py = sys.executable
     try:
-        subprocess.Popen([py, os.path.join(CARPETA, "duelo.py"), "--app", "es", "--progreso", PROGRESO],
+        subprocess.Popen([pythonw(), os.path.join(CARPETA, "duelo.py"), "--app", "es", "--progreso", PROGRESO],
                          cwd=CARPETA, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except OSError:
         pass
@@ -158,6 +200,8 @@ class Manejador(SimpleHTTPRequestHandler):
         if ruta == "/api/ping":
             ultimo_ping = time.time()
             return self._json({"ok": True, "ia": bool(clave_ia())})
+        if ruta == "/api/version":
+            return self._json({"local": version_local(), "remoto": version_remota("fresca" in self.path)})
         if ruta.endswith((".txt", ".json")) or ruta.startswith("/copias"):
             return self._json({"error": "no"}, 404)      # la clave y el progreso no se sirven como archivos
         return super().do_GET()
@@ -178,6 +222,10 @@ class Manejador(SimpleHTTPRequestHandler):
             guardar_progreso(datos)
             ultimo_ping = time.time()
             return self._json({"ok": True})
+        if ruta == "/api/oppdater":
+            if version_remota(True) <= version_local():
+                return self._json({"ok": False, "motivo": "ingen ny versjon"})
+            return self._json({"ok": oppdatere()})
         if ruta == "/api/ia":
             return self._json(corregir(str(datos.get("texto", "")), str(datos.get("contexto", ""))))
         return self._json({"error": "no existe"}, 404)
