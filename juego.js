@@ -24,9 +24,19 @@ const BOTIN = [
     dato: "Morsomt faktum: ekte vikinger brukte aldri hornhjelmer. Hornene kommer fra operaer og malerier på 1800-tallet." },
   { id: "hacha-odin", r: "legendary", n: "Odins gyldne økser", tipo: "arma", ic: "crossed-axes", color: "#ffb020" },
 ];
+/* Economía (plan aprobado por Elena el 20-oct-2026): el mismo pueblo de A1 a B2, un capítulo por nivel de español.
+   En A1 todo llega al nivel 5; los niveles de A2, B1 y B2 se calculan al llegar. El Langhuset manda: nadie lo pasa.
+   Precios = subir al nivel 2, 3, 4 y 5. Ajustar cuando él lleve 2 semanas jugando. */
+const KAPITTEL = "A1", MAKS_NIVEL = 5;
+const PRECIOS = { salon: [500, 1200, 2000, 3000], empalizada: [300, 700, 1200, 1800], molino: [300, 800, 1400, 2000], forja: [400, 900, 1500, 2200] };
+const MOLINO = [{ h: 6, max: 48 }, { h: 8, max: 80 }, { h: 10, max: 120 }, { h: 12, max: 160 }, { h: 15, max: 200 }];
+const PRIS_DUP = { common: 15, rare: 40, epic: 120, legendary: 400 };     // lo que paga el Markedet por un duplicado
+const coste = id => l => PRECIOS[id][l - 1];
 const EDIFICIOS = {
-  salon: { n: "Langhuset", ic: "viking-longhouse", coste: l => 150 * l, efecto: l => l > 1 ? `+${10 * (l - 1)} % gull fra tokt` : "Hjemmet ditt. Oppgrader for mer gull.", max: 5 },
-  empalizada: { n: "Palisaden", ic: "palisade", coste: l => 100 * l, efecto: l => l > 1 ? `Stopper ${l - 1} spansk${l > 2 ? "e" : "t"} angrep før de når gullet ditt` : "Oppgrader for å beskytte gullet ditt.", max: 5 },
+  salon: { n: "Langhuset", ic: "viking-longhouse", coste: coste("salon"), efecto: l => l > 1 ? `+${10 * (l - 1)} % gull fra tokt` : "Hjemmet ditt. Oppgrader for mer gull.", max: MAKS_NIVEL },
+  empalizada: { n: "Palisaden", ic: "palisade", coste: coste("empalizada"), efecto: l => l > 1 ? `Stopper ${l - 1} spansk${l > 2 ? "e" : "t"} angrep før de når gullet ditt` : "Oppgrader for å beskytte gullet ditt.", max: MAKS_NIVEL },
+  molino: { n: "Mølla", ic: "coins-pile", coste: coste("molino"), efecto: l => `${MOLINO[l - 1].h} gull i timen, plass til ${MOLINO[l - 1].max}`, max: MAKS_NIVEL },
+  forja: { n: "Smia", ic: "anvil", coste: coste("forja"), efecto: l => l > 1 ? `+${3 * (l - 1)} % sjanse for sjelden i kistene` : "Oppgrader for bedre kister.", max: MAKS_NIVEL },
 };
 const BLOQUEADOS = [
   { n: "Tavernaen", ic: "beer-stein", txt: "Oppdrag 3: mat og drikke" },
@@ -75,12 +85,12 @@ function lev(a, b) {
 
 /* ================= partida ================= */
 function nueva() {
-  return { v: 1, nombre: "", creado: hoy(), revisado: masDias(hoy(), -1), oro: 30, lp: 0, edif: { salon: 1, empalizada: 1 }, mejora: null,
+  return { v: 1, nombre: "", creado: hoy(), revisado: masDias(hoy(), -1), oro: 30, lp: 0, edif: { salon: 1, empalizada: 1, molino: 1, forja: 1 }, mejora: null, dup: {}, taverna: { f: "", n: 0 },
     dias: {}, misiones: {}, inv: [], equipo: { casco: null, arma: null, escudo: null, titulo: null },
     semanasPerfectas: {}, cuerno: { f: "", n: 0, prox: 0 }, ajustes: { volumen: 50, auto: true } };
 }
 let J, SERVIDOR = false, IA = false;
-function completar(x) { const j = Object.assign(nueva(), x); j.ajustes = Object.assign(nueva().ajustes, x.ajustes || {}); return j; }
+function completar(x) { const j = Object.assign(nueva(), x); j.ajustes = Object.assign(nueva().ajustes, x.ajustes || {}); j.edif = Object.assign(nueva().edif, x.edif || {}); return j; }
 /* Con el servidor (Jugar.bat) el progreso va a progreso.json: lo leen el aviso de las 20:00 y el duelo. Sin él, solo este navegador. */
 async function cargar() {
   let local = null, remoto = null;
@@ -132,7 +142,7 @@ function ataque(d) {
   let txt;
   if (J.edif.empalizada > 1) { J.edif.empalizada--; J.fuego = "empalizada"; txt = `brente palisaden din (nivå ${J.edif.empalizada + 1} → ${J.edif.empalizada}).`; }
   else {
-    const r = Math.min(J.oro, Math.max(10, Math.round(J.oro * 0.4)));
+    const r = Math.min(J.oro, 300, Math.max(10, Math.round(J.oro * 0.25)));
     J.oro -= r; J.fuego = "salon"; txt = r ? `brøt seg inn i langhuset ditt og stjal ${r} gull.` : "knuste døra til det tomme langhuset ditt.";
   }
   const lp = Math.min(J.lp, 15); J.lp -= lp;
@@ -275,13 +285,17 @@ const TIPOS = {
   forja: { w: 4, h: 4, edif: "forja" }, molino: { w: 4, h: 4, edif: "molino" },
   taberna: { w: 3, h: 3, edif: "taberna" }, mercado: { w: 3, h: 3, edif: "mercado" },
   muro: { muro: true, n: "Palisade" },
-  casa1: { w: 2, h: 2, n: "Hus", p: 60 }, casa2: { w: 2, h: 2, n: "Hus", p: 60 }, casa3: { w: 2, h: 2, n: "Steinhus", p: 80 },
-  granero: { w: 3, h: 3, n: "Låve", p: 70 }, tienda: { w: 2, h: 2, n: "Telt", p: 35 }, choza: { w: 2, h: 2, n: "Hytte", p: 50 },
-  campo: { w: 2, h: 2, plano: true, n: "Åker", p: 20 }, campo2: { w: 2, h: 2, plano: true, n: "Kornåker", p: 20 },
-  pino: { n: "Gran", p: 15, q: 10 }, arbol: { n: "Tre", p: 15, q: 10 }, arbusto: { n: "Busk", p: 10, q: 5 }, arbusto2: { n: "Bærbusk", p: 12, q: 5 },
-  roca2: { n: "Stein", p: 10, q: 5 }, roca: { n: "Steinrøys", p: 20, q: 10 }, tronco: { n: "Tømmerstokk", p: 10, q: 5 },
-  pozo: { n: "Brønn", p: 40 }, fuego: { n: "Bål", p: 25 }, cobre: { n: "Kobberåre", p: 40 }, oro: { n: "Gullåre", p: 60 }, estatua: { n: "Statue", p: 80 },
+  casa1: { w: 2, h: 2, n: "Hus", p: 120 }, casa2: { w: 2, h: 2, n: "Hus", p: 120 }, casa3: { w: 2, h: 2, n: "Steinhus", p: 160 },
+  granero: { w: 3, h: 3, n: "Låve", p: 140 }, tienda: { w: 2, h: 2, n: "Telt", p: 70 }, choza: { w: 2, h: 2, n: "Hytte", p: 100 },
+  campo: { w: 2, h: 2, plano: true, n: "Åker", p: 40 }, campo2: { w: 2, h: 2, plano: true, n: "Kornåker", p: 40 },
+  pino: { n: "Gran", p: 30, q: 10 }, arbol: { n: "Tre", p: 30, q: 10 }, arbusto: { n: "Busk", p: 20, q: 5 }, arbusto2: { n: "Bærbusk", p: 24, q: 5 },
+  roca2: { n: "Stein", p: 20, q: 5 }, roca: { n: "Steinrøys", p: 40, q: 10 }, tronco: { n: "Tømmerstokk", p: 20, q: 5 },
+  pozo: { n: "Brønn", p: 80 }, fuego: { n: "Bål", p: 50 }, cobre: { n: "Kobberåre", p: 80 }, oro: { n: "Gullåre", p: 120 }, estatua: { n: "Statue", p: 160 },
+  // pynt especial: solo se compra en el Markedet
+  gullstatue: { n: "Gullstatue", p: 300 }, banner_r: { n: "Rødt banner", p: 300 }, banner_b: { n: "Blått banner", p: 300 }, banner_g: { n: "Grønt banner", p: 300 },
+  gullbronn: { n: "Gullbrønn", p: 600 }, storstatue: { w: 2, h: 2, img: "gullstatue", n: "Stor gullstatue", p: 1000 },
 };
+const ESPECIALES = ["gullstatue", "banner_r", "banner_b", "banner_g", "gullbronn", "storstatue"];
 /* Lo que ocupa cada dibujo de Kenney (x0, y0, x1, y1 dentro de sus 128 px): se recorta para que lo ancho sea justo su base. */
 const CAJA = {
   salon: [8, 4, 120, 124], muralla: [4, 52, 124, 128], forja: [4, 4, 124, 124], molino: [12, 4, 116, 124], taberna: [20, 4, 108, 124],
@@ -289,6 +303,7 @@ const CAJA = {
   tienda: [20, 48, 108, 128], choza: [20, 56, 108, 128], campo: [0, 0, 128, 128], campo2: [0, 0, 128, 128], pino: [37, 16, 90, 112],
   arbol: [46, 20, 84, 112], arbusto: [44, 40, 84, 86], arbusto2: [44, 37, 84, 84], roca: [26, 32, 102, 96], roca2: [32, 36, 96, 92],
   tronco: [28, 50, 100, 80], pozo: [32, 24, 96, 104], fuego: [43, 0, 86, 96], cobre: [26, 30, 102, 100], oro: [26, 30, 102, 100], estatua: [44, 28, 84, 100],
+  gullstatue: [44, 28, 84, 100], gullbronn: [32, 24, 96, 104], banner_r: [56, 8, 109, 113], banner_b: [56, 8, 109, 113], banner_g: [56, 8, 109, 113],
 };
 function dibujo(n, src, W) {     // devuelve [elemento, alto]: el dibujo recortado, W px de ancho
   const [x0, y0, x1, y1] = CAJA[n] || [0, 0, 128, 128], k = W / (x1 - x0), H = Math.round((y1 - y0) * k);
@@ -353,7 +368,7 @@ function situar(el, t, c, r) {
   el.style.top = (T.muro ? REJ.y + r * CELDA : pie - (+el.dataset.h || T.h * CELDA)) + "px";
   el.style.zIndex = T.plano ? 1 : pie;
 }
-const MOLINO_HORA = 6, MOLINO_MAX = 48;      // oro por hora y tope del molino
+const molinoNivel = () => MOLINO[Math.min(MOLINO.length, J.edif.molino || 1) - 1];      // oro por hora y tope del molino
 function semilla(n) { return () => { n = (n * 9301 + 49297) % 233280; return n / 233280; }; }
 function bosque() {     // árboles alrededor de la zona edificable (no estorban)
   const out = [], r = semilla(7);
@@ -366,7 +381,8 @@ function bosque() {     // árboles alrededor de la zona edificable (no estorban
 }
 function oroMolino() {
   if (!J.molino) { J.molino = { t: Date.now() }; guardar(); }
-  return Math.min(MOLINO_MAX, Math.floor((Date.now() - J.molino.t) / 3600e3 * MOLINO_HORA));
+  const M = molinoNivel();
+  return Math.min(M.max, Math.floor((Date.now() - J.molino.t) / 3600e3 * M.h));
 }
 function recogerMolino(cerca) {
   const n = oroMolino(); if (n < 1) return 0;
@@ -462,7 +478,7 @@ function objetoMapa(o, rotulos, muros) {
     // cartel siempre visible: va en su propia capa, encima de todo (el de la puerta, debajo, para no tapar el Langhuset)
     const pie = REJ.y + (o.r + T.h) * CELDA, abajo = P.id === "empalizada";
     const ro = h("div", { class: "rotulo" + (abajo ? " abajo" : ""), style: `left:${REJ.x + o.c * CELDA + W / 2}px;top:${abajo ? pie + 6 : pie - H - 4}px` },
-      P.id === "molino" && oroMolino() >= MOLINO_HORA ? h("div", { class: "burbuja-oro", title: "Samle inn" }, ic("two-coins", "", "#e0b04f"), " +" + oroMolino()) : null,
+      P.id === "molino" && oroMolino() >= molinoNivel().h ? h("div", { class: "burbuja-oro", title: "Samle inn" }, ic("two-coins", "", "#e0b04f"), " +" + oroMolino()) : null,
       h("div", { class: "cartel" }, bloq ? `🔒 ${P.n}` : nivel ? `${P.n} · nv. ${nivel}` : P.n),
       J.mejora && J.mejora.id === P.id ? h("div", { class: "obra" }, "🔨 ", cuenta(J.mejora.fin - Date.now())) : null);
     rotulos.append(ro); el._rotulo = ro;
@@ -587,10 +603,10 @@ function catalogoBygg() {
   return h("div", { class: "catalogo" },
     h("div", { class: "fila entre" }, h("b", null, "🛠️ Bygg leiren din"), h("button", { class: "btn chico oro", onclick: () => { modoBygg = false; pyntValgt = null; seleccion = null; pintarCampamento(); } }, "Ferdig ✓ ⏎")),
     barra,
-    h("div", { class: "catalogo-lista" }, nuevos, TIENDA.map(t => {
+    h("div", { class: "catalogo-lista" }, nuevos, [...TIENDA, ...ESPECIALES.filter(t => P.lager[t] > 0)].map(t => {
       const D = tipo(t), quedan = limiteMuro() - murosPuestos();
       return h("button", { class: "pieza" + (pyntValgt === t ? " elegida" : ""), onclick: () => { pyntValgt = pyntValgt === t ? null : t; seleccion = null; pintarCampamento(); } },
-        D.muro ? h("span", { class: "pieza-muro" }, ic("palisade", "", "#c9a26b")) : h("img", { src: arte(t), alt: "", draggable: "false" }),
+        D.muro ? h("span", { class: "pieza-muro" }, ic("palisade", "", "#c9a26b")) : h("img", { src: arte(D.img), alt: "", draggable: "false" }),
         h("span", null, D.n),
         D.muro ? h("small", null, `${quedan} igjen`) : P.lager[t] ? h("small", null, `${P.lager[t]} på lager`) : h("small", null, ic("two-coins", "", "#e0b04f"), " " + D.p));
     })));
@@ -674,39 +690,80 @@ function abrirFarger() {
 }
 /* Ficha de un edificio (como en Clash of Clans). */
 function abrirEdificio(P, el) {
-  const nivel = J.edif[P.id], bloq = P.bloq && !(J.misiones[P.bloq - 1] > 0) && P.bloq > 1;
-  const cuerpo = [h("img", { src: arte(P.img, P.id), alt: "", style: "width:120px" }), h("h2", null, P.n + (nivel ? ` · nivå ${nivel}` : ""))];
+  const E = EDIFICIOS[P.id], nivel = J.edif[P.id], bloq = bloqueado(P);
+  const cuerpo = [h("img", { src: arte(P.img, P.id), alt: "", style: "width:120px" }), h("h2", null, P.n + (E ? ` · nivå ${nivel}` : ""))];
   const fila = h("div", { class: "fila centro", style: "margin-top:14px" });
   let cerrar;
+  const otraVez = () => { cerrar(); pintarCampamento(); abrirEdificio(P, el); };
   if (bloq) cuerpo.push(h("p", { class: "dim" }, `🔒 Låses opp når du har klart oppdrag ${P.bloq - 1}: ${P.txt}.`));
-  else if (P.id === "molino") {
-    const n = oroMolino();
-    cuerpo.push(h("p", null, `Mølla lager ${MOLINO_HORA} gull i timen (maks ${MOLINO_MAX}). Kom tilbake og samle inn!`), h("p", { class: "botin-cuenta" }, ic("two-coins", "", "#e0b04f"), ` ${n} klar`));
-    fila.append(h("button", { class: "btn oro", disabled: n < 1, onclick: () => { recogerMolino(el); cerrar(); pintarCampamento(); } }, `Samle inn ${n} gull`));
-  } else if (P.id === "forja") {
-    cuerpo.push(h("p", null, `Her ligger byttet fra kistene: ${J.inv.length} ting. Kle deg ut som en ekte viking!`));
-    fila.append(h("button", { class: "btn oro", onclick: () => { cerrar(); inventario(); } }, "Åpne smia"));
-  } else if (EDIFICIOS[P.id]) {
-    const E = EDIFICIOS[P.id], coste = E.coste(nivel);
-    cuerpo.push(h("p", null, E.efecto(nivel)));
-    if (J.fuego === P.id) cuerpo.push(h("p", { style: "color:#ff8a80" }, "🔥 Capitán Rodrigo satte fyr på den. Dra på tokt for å slukke brannen!"));
-    if (J.mejora && J.mejora.id === P.id) cuerpo.push(h("p", { class: "dim" }, `🔨 Byggerne jobber. Klar om ${cuenta(J.mejora.fin - Date.now())}.`));
-    else if (nivel >= E.max) cuerpo.push(h("p", { class: "dim" }, "Maks nivå."));
-    else {
-      cuerpo.push(h("p", { class: "faint" }, `Neste nivå: ${E.efecto(nivel + 1)}. Ferdig kl. 20:00.`));
-      fila.append(h("button", { class: "btn oro", disabled: !!J.mejora || J.oro < coste, title: J.mejora ? "Byggerne dine er opptatt" : "",
-        onclick: () => { J.oro -= coste; J.mejora = { id: P.id, fin: proximas20() }; guardar(); SFX.madera(); cerrar(); pintarCampamento(); } },
-        ic("two-coins", "", "#2a1d05"), ` ${coste} · Oppgrader`));
-      if (J.mejora) cuerpo.push(h("p", { class: "faint" }, "Byggerne dine er opptatt med en annen bygning."));
-      else if (J.oro < coste) cuerpo.push(h("p", { class: "faint" }, `Du trenger ${coste - J.oro} gull til. Dra på tokt!`));
+  else {
+    if (P.id === "molino") {
+      const n = oroMolino(), M = molinoNivel();
+      cuerpo.push(h("p", null, `Mølla lager ${M.h} gull i timen (maks ${M.max}). Kom tilbake og samle inn!`), h("p", { class: "botin-cuenta" }, ic("two-coins", "", "#e0b04f"), ` ${n} klar`));
+      fila.append(h("button", { class: "btn oro", disabled: n < 1, onclick: () => { recogerMolino(el); cerrar(); pintarCampamento(); } }, `Samle inn ${n} gull`));
+    }
+    if (P.id === "forja") {
+      cuerpo.push(h("p", null, `Her ligger byttet fra kistene: ${J.inv.length} ting. Kle deg ut som en ekte viking!`));
+      fila.append(h("button", { class: "btn oro", onclick: () => { cerrar(); inventario(); } }, "Åpne smia"));
+    }
+    if (P.id === "taberna") taverna(cuerpo, fila, () => cerrar);
+    if (P.id === "mercado") markedet(cuerpo, () => cerrar, otraVez);
+    if (E) {
+      if (P.id !== "molino") cuerpo.push(h("p", null, E.efecto(nivel)));
+      if (J.fuego === P.id) cuerpo.push(h("p", { style: "color:#ff8a80" }, "🔥 Capitán Rodrigo satte fyr på den. Dra på tokt for å slukke brannen!"));
+      const c = E.coste(nivel);
+      if (J.mejora && J.mejora.id === P.id) cuerpo.push(h("p", { class: "dim" }, `🔨 Byggerne jobber. Klar om ${cuenta(J.mejora.fin - Date.now())}.`));
+      else if (nivel >= E.max) cuerpo.push(h("p", { class: "dim" }, `Maks nivå i kapittel ${KAPITTEL}. Flere nivåer kommer i neste kapittel.`));
+      else if (P.id !== "salon" && nivel >= J.edif.salon) cuerpo.push(h("p", { class: "dim" }, `🔒 Oppgrader Langhuset til nivå ${nivel + 1} først. Langhuset bestemmer.`));
+      else {
+        cuerpo.push(h("p", { class: "faint" }, `Neste nivå: ${E.efecto(nivel + 1)}. Ferdig kl. 20:00.`));
+        fila.append(h("button", { class: "btn oro", disabled: !!J.mejora || J.oro < c, title: J.mejora ? "Byggerne dine er opptatt" : "",
+          onclick: () => { J.oro -= c; J.mejora = { id: P.id, fin: proximas20() }; guardar(); SFX.madera(); cerrar(); pintarCampamento(); } },
+          ic("two-coins", "", "#2a1d05"), ` ${c} · Oppgrader`));
+        if (J.mejora) cuerpo.push(h("p", { class: "faint" }, "Byggerne dine er opptatt med en annen bygning."));
+        else if (J.oro < c) cuerpo.push(h("p", { class: "faint" }, `Du trenger ${c - J.oro} gull til. Dra på tokt!`));
+      }
     }
   }
   fila.append(h("button", { class: "btn", onclick: () => cerrar() }, "Lukk"));
-  cuerpo.push(selectorTono(P.img, P.id, () => { cerrar(); pintarCampamento(); abrirEdificio(P, el); }));
-  cerrar = modal([...cuerpo, fila]);
+  cuerpo.push(selectorTono(P.img, P.id, otraVez));
+  cerrar = modal(plano(cuerpo, fila), P.id === "mercado" ? "ancho" : "");
   TECLAS.enter = () => { cerrar(); pintarCampamento(); };
-  // en el molino, tocarlo con oro listo también lo recoge directamente
-  if (P.id === "molino" && oroMolino() >= MOLINO_HORA && !bloq) { /* la ficha ya ofrece el botón */ }
+}
+/* Tavernaen (plan de economía): kister por oro, como mucho 3 al día. Nunca dinero real. */
+const TAVERNA_KISTER = [{ n: "Kiste", p: 150, tipo: { min: null, titulo: "TAVERNA-KISTE" } },
+  { n: "Stor kiste", p: 600, tipo: { min: "rare", titulo: "STOR KISTE", texto: "Sjelden eller bedre garantert!" } }];
+const tavernaHoy = () => (J.taverna && J.taverna.f === hoy() ? J.taverna.n : 0);
+function taverna(cuerpo, fila, cerrar) {
+  const igjen = 3 - tavernaHoy();
+  cuerpo.push(h("p", null, "Kjøp kister for gullet fra toktene dine. Maks 3 om dagen."), h("p", { class: "faint" }, igjen > 0 ? `${igjen} igjen i dag` : "Tavernaen er stengt til i morgen."));
+  for (const K of TAVERNA_KISTER)
+    fila.append(h("button", { class: "btn oro", disabled: igjen < 1 || J.oro < K.p, onclick: () => { cerrar()(); kjopKiste(K); } }, ic("chest", "", "#2a1d05"), ` ${K.n} · ${K.p}`));
+  if (igjen > 0 && J.oro < TAVERNA_KISTER[0].p) cuerpo.push(h("p", { class: "faint" }, `Du trenger ${TAVERNA_KISTER[0].p - J.oro} gull til. Dra på tokt!`));
+}
+async function kjopKiste(K) {
+  if (J.oro < K.p || tavernaHoy() >= 3) return;
+  J.oro -= K.p; J.taverna = { f: hoy(), n: tavernaHoy() + 1 }; guardar(); SFX.moneda();
+  try { await abrirCofre(K.tipo); } catch (e) { }
+  pintarCampamento();
+}
+/* Markedet (plan de economía): compra los duplicados y vende pynt especial. */
+function markedet(cuerpo, cerrar, otraVez) {
+  const dup = Object.entries(J.dup || {}).filter(([, n]) => n > 0);
+  cuerpo.push(h("h3", null, "Selg duplikater"),
+    dup.length ? h("div", { class: "lista-dup" }, dup.map(([id, n]) => {
+      const b = BOTIN.find(x => x.id === id), pris = PRIS_DUP[b.r];
+      return h("div", { class: "fila entre fila-dup" }, h("span", null, ic(b.ic, "", b.color || RAREZAS[b.r].c), ` ${b.n} ×${n}`),
+        h("button", { class: "btn chico oro", onclick: () => { J.dup[id]--; J.oro += pris; guardar(); SFX.moneda(); otraVez(); } }, ic("two-coins", "", "#2a1d05"), ` Selg · ${pris}`));
+    })) : h("p", { class: "faint" }, "Ingen duplikater ennå. De kommer fra kistene."),
+    h("h3", null, "Spesiell pynt"),
+    h("div", { class: "catalogo-lista" }, ESPECIALES.map(t => {
+      const D = tipo(t);
+      return h("button", { class: "pieza", disabled: J.oro < D.p, onclick: () => {
+        if (J.oro < D.p) return;
+        J.oro -= D.p; const L = pynt().lager; L[t] = (L[t] || 0) + 1; guardar(); SFX.moneda(); cerrar()(); pintarCampamento(); aviso2(`${D.n} ligger på lageret. Sett den ut i 🛠️ Bygg.`);
+      } }, h("img", { src: arte(D.img), alt: "", draggable: "false" }), h("span", null, D.n), h("small", null, ic("two-coins", "", "#e0b04f"), " " + D.p));
+    })));
 }
 function cartaTokt(m) {
   const t = hoy(), lun = lunesDe(t);
@@ -1188,7 +1245,8 @@ async function resultado(m, st) {
   const pct = st.total ? st.aciertos / st.total : 1;
   const lpAntes = J.lp, rAntes = rango(J.lp);
   const lp = primera ? 15 + Math.round(pct * 10) : extras < 3 ? 5 : 0;
-  const oro = Math.round(st.oro * (1 + 0.1 * (J.edif.salon - 1)));
+  const mitad = (J.dias[t] || 0) >= 3;      // desde el 4.º tokt del día, la mitad (que no se queme)
+  const oro = Math.round(st.oro * (1 + 0.1 * (J.edif.salon - 1)) * (mitad ? 0.5 : 1));
   J.dias[t] = (J.dias[t] || 0) + 1; J.misiones[m.id] = (J.misiones[m.id] || 0) + 1;
   J.oro += oro; J.lp += lp; if (primera) J.fuego = null; guardar();
   const rDespues = rango(J.lp), sube = rDespues.i > rAntes.i;
@@ -1197,6 +1255,8 @@ async function resultado(m, st) {
   if (perfecta) { J.semanasPerfectas[lun] = true; guardar(); }
   // rekke: con el primer tokt del día se ve si toca kiste (cada 5 días seguidos)
   const rk = racha(), premioRacha = primera && !esFinde(t) && rk > 0 && rk % 5 === 0;
+  const bonusRacha = premioRacha ? (rk % 20 === 0 ? 200 : 50) : 0;
+  if (bonusRacha) { J.oro += bonusRacha; guardar(); }
   await esperarSalida(new Promise(res => {
     if (sube) SFX.victoria();
     pantalla(h("div", { class: "escena runa" }, ic("laurels-trophy", "xg", rDespues.c), h("h1", null, "Toktet er ferdig"),
@@ -1204,23 +1264,31 @@ async function resultado(m, st) {
       h("p", { class: "botin-cuenta" }, `+${oro} gull · +${lp} LP`),
       sube ? h("h2", { style: `color:${rDespues.c}` }, `⬆ NY RANG: ${rDespues.n}!`) : h("p", { class: "dim" }, `${rDespues.n} · ${J.lp} LP`),
       primera && !esFinde(t) ? h("p", { style: "color:var(--verde);font-weight:700" }, "🛡️ Leiren din er trygg i dag.") : null,
-      primera && !esFinde(t) ? h("p", { class: "racha-txt" }, `🔥 ${rk} på rad`, premioRacha ? " · REKKEKISTE!" : ` · ${5 - rk % 5} til neste kiste`) : null,
+      primera && !esFinde(t) ? h("p", { class: "racha-txt" }, `🔥 ${rk} på rad`, premioRacha ? ` · REKKEKISTE + ${bonusRacha} gull!` : ` · ${5 - rk % 5} til neste kiste`) : null,
+      mitad ? h("p", { class: "faint" }, "Tokt nr. 4 eller mer i dag: halvt gull. Hjernen trenger hvile også!") : null,
       lpAntes === J.lp && !primera ? h("p", { class: "faint" }, "Ekstra tokt i dag gir fortsatt gull og kister.") : null,
       h("button", { class: "btn oro grande", onclick: res }, "ÅPNE KISTEN ⏎")));
     TECLAS.enter = res;
   }));
   await abrirCofre(null);
-  if (premioRacha) await abrirCofre({ min: rk % 20 === 0 ? "legendary" : "epic", dias: rk });
+  if (premioRacha) {
+    const leg = rk % 20 === 0;
+    await abrirCofre({ min: leg ? "legendary" : "epic", titulo: "REKKEKISTE", texto: `🔥 ${rk} ukedager på rad: ${leg ? "legendarisk garantert" : "episk eller bedre garantert"}!` });
+  }
+}
+function sjanser() {     // la Smia sube la suerte: +3 % de sjelden por nivel (sale de vanlig)
+  const k = 3 * ((J.edif.forja || 1) - 1);
+  return { common: RAREZAS.common.p - k, rare: RAREZAS.rare.p + k, epic: RAREZAS.epic.p, legendary: RAREZAS.legendary.p };
 }
 function tirar(minimo) {
-  const orden = ["common", "rare", "epic", "legendary"];
+  const orden = ["common", "rare", "epic", "legendary"], S = sjanser();
   let r, x = Math.random() * 100;
-  for (const k of orden) { if (x < RAREZAS[k].p) { r = k; break; } x -= RAREZAS[k].p; }
+  for (const k of orden) { if (x < S[k]) { r = k; break; } x -= S[k]; }
   if (minimo && orden.indexOf(r) < orden.indexOf(minimo)) r = minimo;
   const pool = BOTIN.filter(b => b.r === r);
   return pool[Math.floor(Math.random() * pool.length)];
 }
-function abrirCofre(especial) {     // especial = { min, dias }: kiste de la rekke
+function abrirCofre(especial) {     // especial = { min, titulo, texto }: kiste de la rekke o de la Tavernaen
   const perfecto = !!especial;
   return esperarSalida(new Promise(res => {
     const premio = tirar(perfecto ? especial.min : null);
@@ -1242,7 +1310,7 @@ function abrirCofre(especial) {     // especial = { min, dias }: kiste de la rek
       SFX.premio(premio.r);
       let extra = "";
       if (premio.oro) { J.oro += premio.oro; extra = `+${premio.oro} gull`; }
-      else if (J.inv.includes(premio.id)) { J.oro += 30; extra = "Duplikat → +30 gull"; }
+      else if (J.inv.includes(premio.id)) { J.dup = J.dup || {}; J.dup[premio.id] = (J.dup[premio.id] || 0) + 1; extra = `Duplikat → selg den på Markedet for ${PRIS_DUP[premio.r]} gull`; }
       else { J.inv.push(premio.id); extra = "Lagt i smia di"; }
       guardar();
       const c = RAREZAS[premio.r].c;
@@ -1255,11 +1323,11 @@ function abrirCofre(especial) {     // especial = { min, dias }: kiste de la rek
       TECLAS.enter = res;
     }
     pantalla(h("div", { class: "escena cofre" },
-      h("h1", null, perfecto ? "REKKEKISTE" : "Tokt-kiste"),
-      perfecto ? h("p", { style: `color:${RAREZAS[especial.min].c};font-weight:700` }, `🔥 ${especial.dias} ukedager på rad: ${especial.min === "legendary" ? "legendarisk garantert" : "episk eller bedre garantert"}!`) : null,
+      h("h1", null, perfecto ? especial.titulo : "Tokt-kiste"),
+      perfecto && especial.texto ? h("p", { style: `color:${especial.min ? RAREZAS[especial.min].c : "var(--oro)"};font-weight:700` }, especial.texto) : null,
       caja, info, zona,
-      h("div", { class: "probabilidades" }, "Sjanser: ", Object.entries(RAREZAS).map(([k, v], i) => [i ? " · " : "", h("b", { style: `color:${v.c}` }, NOMBRE_RAREZA[k]), ` ${v.p} %`]),
-        perfecto ? (especial.min === "legendary" ? " (denne kisten: legendarisk)" : " (denne kisten: episk eller bedre)") : "", h("br"), "Aldri ekte penger. Kister får du bare fra tokt.")));
+      h("div", { class: "probabilidades" }, "Sjanser: ", Object.entries(RAREZAS).map(([k, v], i) => [i ? " · " : "", h("b", { style: `color:${v.c}` }, NOMBRE_RAREZA[k]), ` ${sjanser()[k]} %`]),
+        perfecto && especial.min ? (especial.min === "legendary" ? " (denne kisten: legendarisk)" : ` (denne kisten: ${NOMBRE_RAREZA[especial.min]} eller bedre)`) : "", h("br"), "Aldri ekte penger. Gullet kommer bare fra tokt.")));
     TECLAS.enter = () => caja.click(); TECLAS.espacio = () => caja.click();
   }));
 }

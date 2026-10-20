@@ -5,12 +5,14 @@ Uso:  python preparar_variantes.py
 - La låve usa el mismo dibujo que la taberna (medievalStructure_16), pero en rojo (låve noruega) y con
   otros tonos, para que nunca se vean iguales.
 - Temas del mapa: _host (otoño) y _vinter (invierno) para la hierba y los árboles.
+- Pynt especial del Markedet: estatua y pozo de Kenney en oro, y banderas dibujadas aquí con los colores y
+  bordes de Kenney (no hay banderas CC0 de ese estilo; se buscó en OpenGameArt el 20-oct-2026).
 Necesita Pillow (py -m pip install pillow).
 """
 import colorsys
 import os
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 CARPETA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "arte", "kenney")
 
@@ -62,6 +64,37 @@ def invierno(im):
     return im
 
 
+def oro(im):
+    """Lo gris (piedra) pasa a oro, con sus luces y sombras."""
+    tramos = [(0.0, (90, 66, 18)), (0.35, (138, 106, 34)), (0.65, (224, 176, 79)), (1.0, (255, 232, 150))]
+    px = im.load()
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
+            h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            if s > 0.25:
+                continue
+            for (v0, c0), (v1, c1) in zip(tramos, tramos[1:]):
+                if v <= v1:
+                    k = (v - v0) / (v1 - v0)
+                    px[x, y] = tuple(int(c0[i] + (c1[i] - c0[i]) * k) for i in range(3)) + (a,)
+                    break
+    return im
+
+
+def bandera(tela, borde):
+    """Bandera vikinga de 128 px: palo de madera, pomo de oro y tela con cola de golondrina."""
+    im = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rectangle((60, 16, 68, 112), fill=(154, 106, 53), outline=(92, 58, 26), width=3)
+    d.polygon([(68, 24), (108, 24), (108, 78), (88, 66), (68, 78)], fill=tela, outline=borde, width=4)
+    d.ellipse((80, 36, 96, 52), fill=(255, 247, 224), outline=borde, width=3)
+    d.ellipse((56, 8, 72, 24), fill=(224, 176, 79), outline=(138, 106, 34), width=3)
+    return im
+
+
 def main():
     n = 0
     for nombre, (banda, d1, d2) in EDIFICIOS.items():
@@ -79,6 +112,11 @@ def main():
         (Image.open(os.path.join(CARPETA, "nieve.png")).convert("RGBA") if nombre == "hierba" else invierno(base.copy())).save(
             os.path.join(CARPETA, f"{nombre}_vinter.png"), optimize=True)
         n += 2
+    oro(Image.open(os.path.join(CARPETA, "estatua.png")).convert("RGBA")).save(os.path.join(CARPETA, "gullstatue.png"), optimize=True)
+    oro(Image.open(os.path.join(CARPETA, "pozo.png")).convert("RGBA")).save(os.path.join(CARPETA, "gullbronn.png"), optimize=True)
+    for nombre, tela, borde in (("banner_r", (217, 83, 79), (143, 45, 42)), ("banner_b", (76, 141, 255), (42, 79, 153)), ("banner_g", (46, 158, 91), (29, 107, 60))):
+        bandera(tela, borde).save(os.path.join(CARPETA, nombre + ".png"), optimize=True)
+    n += 5
     print(f"{n} variantes en arte/kenney/")
 
 
