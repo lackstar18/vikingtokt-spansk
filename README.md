@@ -17,6 +17,10 @@ Dobbeltklikk **Actualizar.bat**. Fremgangen din blir liggende.
 - Snarvei «Vikingtokt» på skrivebordet.
 - Fjern alt med **Desinstalar.bat**.
 
+## Pynt og farger
+- **🛠️ Pynt**: kjøp pynt med gull (trær, steiner, åkre, brønn, telt, statue …) og sett den i rutene ved stranden. Klikk på pynt for å legge den på lageret.
+- **🎨 Farger**: velg kart (sommer, høst, vinter) og fargen på hver bygning.
+
 ## Venner
 Trykk **👥 Venner** i leiren. Der ser du **vennekoden din**. Gi den til vennene dine, og skriv inn koden deres med **Legg til venn**.
 Da ser du uka deres (x/5) og 🏆. De ser deg når de legger deg til.
