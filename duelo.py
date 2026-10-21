@@ -1,4 +1,4 @@
-"""Duelo por la red de casa (LAN): él con el español, Elena con el noruego. Solo librería estándar de Python.
+"""Duelo por la red de casa (LAN): él con el español, Elara con el noruego. Solo librería estándar de Python.
 
 Cada PC lo tiene en marcha en segundo plano:
 - Lee su propio progreso y cuenta las lecciones / asaltos de esta semana (lunes a viernes, mínimo 5).
@@ -6,17 +6,17 @@ Cada PC lo tiene en marcha en segundo plano:
   No hace falta escribir direcciones: los dos PC se encuentran solos si están en la misma wifi o router.
 - Lo sirve en http://127.0.0.1:8770/duelo (solo en este PC) para que el juego y la app lo enseñen.
 - Guarda el marcador de semanas ganadas en duelo.json (junto a este archivo).
-- LIGA por internet (pedido de Elena, 20 oct): con un código (K7M4-QX2P) juegan amigos de otras casas.
+- LIGA por internet (pedido de Elara, 20 oct): con un código (K7M4-QX2P) juegan amigos de otras casas.
   Usa ntfy.sh (gratis, sin cuentas): el código es la «contraseña» del canal. Solo se envía nombre,
   idioma y lecciones de la semana. ntfy.sh guarda los mensajes 12 h: cada PC se vuelve a anunciar cada 3 h.
 - AMIGOS (20 oct): cada jugador tiene su código de amigo; quien lo añade le ve en su lista (como Clash Royale).
-- VENNETOKT (20 oct, plan aprobado por Elena): en el juego de español se puede atacar a un amigo con un examen corto.
+- VENNETOKT (20 oct, plan aprobado por Elara): en el juego de español se puede atacar a un amigo con un examen corto.
   El juego manda el resultado (POST /vennetokt) al canal del amigo; su duelo lo recoge del suyo y su juego quita
   o da el oro. Quien recibe un ataque ganado tiene escudo 24 h y el atacante pasa a su lista (para la venganza).
 
 Uso:
   pythonw duelo.py --app es --progreso "D:/ElaraAI/Elara/espanol/progreso.json"      (el juego de español)
-  pythonw duelo.py --app no --nombre Elena --progreso "D:/ElaraAI/Elara/noruego/progreso.json"
+  pythonw duelo.py --app no --nombre Elara --progreso "D:/ElaraAI/Elara/noruego/progreso.json"
   --solo-local: prueba en un solo PC (no sale a la red)
 """
 import argparse
@@ -109,7 +109,7 @@ def mis_datos(app, ruta, nombre):
         fechas = list((p.get("completados") or {}).values())
         hechos = sum(1 for f in fechas if lun.isoformat() <= f <= (lun + timedelta(days=6)).isoformat())
         inicio = p.get("inicio")
-        nombre = nombre or "Elena"
+        nombre = nombre or "Elara"
     try:
         ini = date.fromisoformat(inicio) if inicio else None
     except ValueError:

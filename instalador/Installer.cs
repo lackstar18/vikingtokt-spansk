@@ -1,4 +1,4 @@
-// Vikingtokt-Installer.exe (Elena, 20 oct: «un solo instalador: se descarga el instalador, NO toda la carpeta»).
+// Vikingtokt-Installer.exe (Elara, 20 oct: «un solo instalador: se descarga el instalador, NO toda la carpeta»).
 // Descarga el juego de GitHub a %LOCALAPPDATA%\Vikingtokt, instala Python solo para este usuario si falta,
 // ejecuta instalar.ps1 (krigshornet 20:00, duelo, acceso directo) y abre el juego. Sin administrador.
 // Compilar: bygg.bat. Probar sin tocar nada del PC: Vikingtokt-Installer.exe /prueba <carpeta>

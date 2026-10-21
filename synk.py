@@ -1,4 +1,4 @@
-"""Progreso compartido entre el PC y el iPhone (Elena, 20 oct: «el progreso DEBE compartirse»).
+"""Progreso compartido entre el PC y el iPhone (Elara, 20 oct: «el progreso DEBE compartirse»).
 
 El juego guarda una copia en Firebase (Realtime Database del proyecto «vikingtokt», solo con el código de synk).
 Aquí lo usan aviso20.py y duelo.py para ver también lo que jugó en el móvil. Solo librería estándar.

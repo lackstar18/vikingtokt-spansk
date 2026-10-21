@@ -24,7 +24,7 @@ const BOTIN = [
     dato: "Morsomt faktum: ekte vikinger brukte aldri hornhjelmer. Hornene kommer fra operaer og malerier på 1800-tallet." },
   { id: "hacha-odin", r: "legendary", n: "Odins gyldne økser", tipo: "arma", ic: "crossed-axes", color: "#ffb020" },
 ];
-/* Economía (plan aprobado por Elena el 20-oct-2026): el mismo pueblo de A1 a B2, un capítulo por nivel de español.
+/* Economía (plan aprobado por Elara el 20-oct-2026): el mismo pueblo de A1 a B2, un capítulo por nivel de español.
    En A1 todo llega al nivel 5; los niveles de A2, B1 y B2 se calculan al llegar. El Langhuset manda: nadie lo pasa.
    Precios = subir al nivel 2, 3, 4 y 5. Ajustar cuando él lleve 2 semanas jugando. */
 const KAPITTEL = "A1", MAKS_NIVEL = 5;
@@ -113,7 +113,7 @@ function guardar() {
   synkSubir();
   if (SERVIDOR) { clearTimeout(envio); envio = setTimeout(enviar, 300); }
 }
-/* ================= SYNK: el mismo progreso en el PC y en el iPhone (Elena, 20 oct: «DEBE compartirse») =================
+/* ================= SYNK: el mismo progreso en el PC y en el iPhone (Elara, 20 oct: «DEBE compartirse») =================
    Copia en Firebase (Realtime Database del proyecto «vikingtokt»; las reglas solo dejan /synk/<código de 12 o más>).
    El más nuevo manda; los días jugados, las misiones, el botín y las mejores notas se suman de los dos (igual que synk.py). */
 const SYNK = "https://vikingtokt-66e19-default-rtdb.europe-west1.firebasedatabase.app/synk/";
@@ -178,7 +178,7 @@ function rango(lp) {
   return { ...RANGOS[i], i, sig, pct: sig ? (lp - RANGOS[i].lp) / (sig.lp - RANGOS[i].lp) : 1 };
 }
 function lunesDe(f) { return masDias(f, -diaSem(f)); }
-/* Rekke (Elena, 20 oct: «strikes de conexión a los 5 días, tiene recompensa»): días de clase seguidos con tokt.
+/* Rekke (Elara, 20 oct: «strikes de conexión a los 5 días, tiene recompensa»): días de clase seguidos con tokt.
    El finde ni cuenta ni rompe. Cada 5 días, una kiste episk o mejor; cada 20, legendarisk. */
 function rachaHasta(f) {
   let n = 0;
@@ -316,7 +316,7 @@ function avatar() {
 }
 /* ================= CAMPAMENTO: mapa tipo Clash of Clans (arte: Kenney «Medieval RTS», CC0) ================= */
 const K = n => `arte/kenney/${n}.png`;
-/* Colores (Elena, 20 oct: «3 colores de mapa y 3 tonos de cada edificio, que elijan»). */
+/* Colores (Elara, 20 oct: «3 colores de mapa y 3 tonos de cada edificio, que elijan»). */
 const TEMAS = [{ k: "sommer", n: "Sommer", suf: "", fondo: "#4caf50" }, { k: "host", n: "Høst", suf: "_host", fondo: "#c49a2c" }, { k: "vinter", n: "Vinter", suf: "_vinter", fondo: "#e8f4fb" }];
 const TONOS = ["", "_c1", "_c2"];
 const CON_TONO = new Set(["salon", "forja", "taberna", "casa1", "casa2", "casa3", "granero", "choza", "tienda", "muralla", "molino", "mercado"]);
@@ -328,7 +328,7 @@ function arte(n, id) {
   if (CON_TONO.has(n)) return K(n + TONOS[(J.colores || {})[id || (HUS.has(n) ? "hus" : n)] || 0]);
   return K(n);
 }
-/* Pueblo en cuadrícula (Elena, 20 oct: «la cuadrícula es el pueblo entero: ellos eligen dónde colocar las cosas, como Clash of Clans»).
+/* Pueblo en cuadrícula (Elara, 20 oct: «la cuadrícula es el pueblo entero: ellos eligen dónde colocar las cosas, como Clash of Clans»).
    Cada cosa tiene una base de casillas; el dibujo mide justo lo ancho de su base y lo alto sube hacia atrás.
    Lo que está más abajo tapa a lo que tiene detrás. No se giran. */
 const CELDA = 40, REJ = { x: 200, y: 80, cols: 40, filas: 20 };     // zona edificable: x 200-1800, y 80-880
@@ -338,7 +338,7 @@ const PARCELAS = [
   { id: "forja", img: "forja", n: "Smia" }, { id: "molino", img: "molino", n: "Mølla" },
   { id: "taberna", img: "taberna", n: "Tavernaen", bloq: 3, txt: "mat og drikke" }, { id: "mercado", img: "mercado", n: "Markedet", bloq: 5, txt: "tall og priser" },
 ];
-// q = lo que cuesta quitarlo cuando sale como obstáculo (Elena: «no tan caros como Clash of Clans»; la economía se ajusta al final)
+// q = lo que cuesta quitarlo cuando sale como obstáculo (Elara: «no tan caros como Clash of Clans»; la economía se ajusta al final)
 const TIPOS = {
   salon: { w: 5, h: 5, edif: "salon" }, puerta: { w: 5, h: 2, edif: "empalizada" },
   forja: { w: 4, h: 4, edif: "forja" }, molino: { w: 4, h: 4, edif: "molino" },
@@ -892,10 +892,10 @@ async function pintarDuelo(caja, otraVez) {
     return;
   }
   const m = d.marcador || { yo: 0, rival: 0 };
-  info.append(...plano(h("div", { class: "fila entre" }, h("h2", null, `Duell: du mot ${d.rival ? d.rival.nombre : "Elena"}`), h("span", { class: "dim", title: "Uker vunnet" }, `Stilling ${m.yo}–${m.rival}`)),
+  info.append(...plano(h("div", { class: "fila entre" }, h("h2", null, `Duell: du mot ${d.rival ? d.rival.nombre : "Elara"}`), h("span", { class: "dim", title: "Uker vunnet" }, `Stilling ${m.yo}–${m.rival}`)),
     h("div", { class: "faint" }, "Hjemme (samme wifi). Den som når ukeminimumet (5/5) vinner uka."),
     fila(J.nombre, d.yo), d.rival ? fila(d.rival.nombre, d.rival)
-      : h("p", { class: "dim" }, "Elena er ikke sett ennå. Begge PC-ene må være på samme wifi, med appen hennes eller duellen i gang.")));
+      : h("p", { class: "dim" }, "Elara er ikke sett ennå. Begge PC-ene må være på samme wifi, med appen hennes eller duellen i gang.")));
   const kode = h("input", { class: "resp", placeholder: "Kode, f.eks. K7M4-QX2P", maxlength: 12, style: "max-width:240px;font-size:1em;padding:8px 12px", autocomplete: "off" });
   const feil = h("span", { class: "faint" });
   info.append(...plano(h("h3", { style: "margin-top:14px" }, "🏆 Liga med venner (over internett)"),
@@ -961,7 +961,7 @@ function ajustes() {
       h("button", { class: "btn", onclick: () => cerrar() }, "Lukk"),
       h("button", { class: "btn chico rojo", onclick: () => { if (confirm("Slette leiren din og begynne på nytt?") && confirm("Sikker? Dette kan ikke angres.")) { localStorage.removeItem(CLAVE); location.reload(); } } }, "Nullstill"))]);
 }
-/* ================= VENNETOKT (plan aprobado por Elena, 20 oct) =================
+/* ================= VENNETOKT (plan aprobado por Elara, 20 oct) =================
    Atacar a un amigo = examen de 10 preguntas de las misiones que han hecho los dos (2:30).
    Gana si saca más que la mejor nota de su amigo en esa misión (o 10/10). Se lleva el 10 % de su oro (máx. 150),
    menos 1 % por cada nivel de Palisaden del amigo. Si pierde, el amigo gana 20 por defenderse. Nunca se rompen
@@ -1088,7 +1088,7 @@ async function sjekkAngrep() {
       h("button", { class: "btn", onclick: () => cerrar() }, "Lukk"))));
   TECLAS.enter = () => cerrar();
 }
-/* Oppdatering inne i spillet (Elena, 20 oct): el servidor mira version.json en GitHub y lanza actualizar.ps1. */
+/* Oppdatering inne i spillet (Elara, 20 oct): el servidor mira version.json en GitHub y lanza actualizar.ps1. */
 let OPPD = null;     // { local, remoto }
 async function sjekkOppdatering(fresca) {
   if (!SERVIDOR) return null;

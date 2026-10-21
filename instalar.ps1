@@ -1,5 +1,5 @@
 ﻿# Instalador de Vikingtokt (lo ejecuta Instalar.bat o Vikingtokt-Installer.exe). Solo para el usuario actual, sin administrador.
-# -Python: el python.exe que ya ha encontrado o instalado el .exe. -Prueba: solo comprueba, no registra nada (para probar en el PC de Elena).
+# -Python: el python.exe que ya ha encontrado o instalado el .exe. -Prueba: solo comprueba, no registra nada (para probar en el PC de Elara).
 param([string]$Python = '', [switch]$Prueba)
 $ErrorActionPreference = 'Stop'
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -51,4 +51,4 @@ Write-Host ''
 Write-Host 'Ferdig!' -ForegroundColor Green
 Write-Host '- Krigshornet lyder kl. 20:00 mandag til fredag.'
 Write-Host '- Spillet: "Vikingtokt" på skrivebordet.'
-Write-Host '- Hvis Windows spør om brannmuren for Python: trykk "Allow access" (privat nettverk). Det trengs for duellen med Elena.'
+Write-Host '- Hvis Windows spør om brannmuren for Python: trykk "Allow access" (privat nettverk). Det trengs for duellen med Elara.'
